@@ -256,9 +256,12 @@ def funnel_health(cur: dict, baseline: dict, meta_cac, meta_roas,
     else:
         sub["checkout"] = None
 
-    # Vendas: CAC vs. meta (se definida) ou vs. baseline da conta.
+    # Vendas: CAC vs. meta (se definida). Sem meta, a âncora é o TICKET do
+    # período — num funil de venda direta, CAC acima do ticket é prejuízo na
+    # aquisição. Usar a própria conta como referência inflaria a nota (o período
+    # se compararia consigo mesmo e daria 10 mesmo perdendo dinheiro).
     if cur.get("cac") is not None:
-        ref = meta_cac if meta_cac is not None else baseline.get("cac")
+        ref = meta_cac if meta_cac is not None else cur.get("ticket")
         if ref:
             cac_var = (cur["cac"] - ref) / ref
             sub["vendas"] = round(_clamp(10 - cac_var * 10), 1)
@@ -267,9 +270,11 @@ def funnel_health(cur: dict, baseline: dict, meta_cac, meta_roas,
     else:
         sub["vendas"] = None
 
-    # Retorno: ROAS vs. meta (se definida) ou vs. baseline da conta.
+    # Retorno: ROAS vs. meta (se definida). Sem meta, a âncora é 1.0
+    # (break-even): abaixo disso a mídia gasta mais do que fatura, e isso tem
+    # que puxar a nota pra baixo mesmo que a conta inteira esteja assim.
     if cur.get("roas") is not None:
-        ref = meta_roas if meta_roas is not None else baseline.get("roas")
+        ref = meta_roas if meta_roas is not None else 1.0
         if ref:
             sub["retorno"] = round(_clamp(10 * cur["roas"] / ref), 1)
         else:
