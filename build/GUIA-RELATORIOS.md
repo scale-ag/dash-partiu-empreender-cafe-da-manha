@@ -58,120 +58,118 @@ Testar a coleta de números manualmente:
 python build/coletar_dados_relatorio.py --leads-file leads.csv --meta-file meta.csv --out build/relatorios_dados.json
 ```
 
-`build/gerar_relatorios.py` (o gerador **determinístico**, sem IA, mais raso)
-continua no repo como **fallback manual** — não roda mais automaticamente.
-Se a Routine falhar num dia, rode-o pra garantir que a aba não fique vazia:
+O antigo gerador determinístico (`build/gerar_relatorios.py`) foi **removido**
+na conversão deste repositório para funil de venda direta: ele era escrito todo
+no vocabulário de MQL do template e quebraria no schema novo. Se a Routine
+falhar num dia, a aba simplesmente mostra o estado vazio.
 
-```bash
-python build/gerar_relatorios.py --leads-file leads.csv --meta-file meta.csv --out build/relatorios.json
-```
-
-`build/relatorios.json` também pode ser editado à mão seguindo o mesmo
+`build/relatorios.json` pode ser editado à mão seguindo o mesmo
 formato — o build só lê o arquivo, não importa como foi gerado. Se o arquivo
 não existir ou vier vazio, a aba mostra tudo (cards/tabelas/gráficos) menos
 os Insights.
 
 ## Contexto do funil
 
-**Funil de High Ticket (<<PREENCHER: nome do cliente>>)** — <<PREENCHER: descrição
-curta do cliente/oferta>>. Funil de captura via WhatsApp com venda 1:1 (comercial
-fecha por conversa/reunião, não carrinho direto): o anúncio no Meta Ads leva
-a uma página de captura com botão do WhatsApp; ao clicar, o lead chama no
-WhatsApp Business do cliente e o webhook de mensageria dispara na 1ª mensagem,
-que cai na aba **Conversas** (fonte principal de leads deste dashboard). O
-critério de qualificação (MQL) é <<PREENCHER: critério de MQL do cliente, ex.
-"o lead ser médico">> — se qualificado, segue a conversa com o comercial até a
-venda (registrada na aba de Compradores e cruzada de volta ao anúncio por telefone).
+**Funil Perpétuo de venda direta (cliente Rogerio · produto Café da Manhã
+Lucrativo).** Não existe lead nem MQL: o anúncio no Meta Ads leva a uma landing
+page de venda, o visitante inicia o checkout e compra na hora (carrinho direto,
+sem comercial 1:1). A compra cai na aba de Compradores com os UTMs do checkout,
+que são exatamente os nomes de campanha/conjunto/anúncio do Meta Ads — é assim
+que a venda volta para o anúncio de origem.
 
 ```
-Impressões → Cliques/abertura do WhatsApp → Leads → MQLs → Vendas → Faturamento
+Gasto → Impressões → Cliques no link → Visitas na LP → Checkouts iniciados → Vendas → Faturamento
 ```
 
-- **MQL** = coluna de qualificação (<<PREENCHER: nome da coluna de MQL>>) == "Sim" (ver `build.py` → `is_medico`).
-- **Agendamento** = o lead qualificado marcou horário de reunião com o comercial.
-- **Reunião Realizada** = a reunião de fato aconteceu (o lead compareceu). O
-  inverso disso é o **No‑Show** (agendou e não compareceu) — a métrica de alerta
-  mais importante entre Agendamento e Venda.
+- **Visitas na LP** = `Landing Page Views` do Meta Ads.
+- **Checkouts iniciados** = `Initiate Checkout` do Meta Ads (via Adveronix). O
+  custo por checkout é calculado na dash (gasto ÷ checkouts), não vem da planilha.
+  Quando a coluna não existe, a etapa aparece "-" (`has_checkout=false`).
+- **Venda** = linha da aba de Compradores **com UTM completa**. Linha sem UTM é
+  descartada (normalmente Pix gerado e não pago) — nunca a mencione como venda
+  perdida nem some ao faturamento.
+- **Sigla do funil:** `CML`, presente em todas as campanhas
+  (`CML | E6-VEN | P3-FRIO | CONV | …`) e no sufixo dos anúncios (`_CML`).
 
-> **Estado atual dos dados:** enquanto só houver mídia paga × Leads, o funil
-> vai até **MQL**. As etapas seguintes (Agendamentos, Reuniões Realizadas, Vendas,
-> Faturamento) e as métricas derivadas aparecem como “-” até chegar a lista do
-> comercial/vendas. Quando os campos `agendamentos`/`reunioes`/`vendas`/
-> `fat` forem somados por linha em `buildAgg/daily/totals` (`build/app.js`),
-> **toda a UI acende sozinha** (funil, tabelas, Top/Piores).
+> **Não existe** etapa de Agendamento, Reunião Realizada, No‑Show ou MQL neste
+> funil. Se encontrar esse vocabulário em algum texto do repositório, é resquício
+> do template original e não deve ser reproduzido nos Insights.
 
 ## Fórmulas fundamentais
 
-- **Tx MQL** = MQLs ÷ Leads · **CPMQL** = Investimento ÷ MQLs
-- **Tx Agendamento** = Agendamentos ÷ MQLs · **CPAG** = Investimento ÷ Agendamentos
-- **Tx NS** = No-Shows÷ Agendamentos · **CPNS** = Investimento ÷ No-Shows
-- **No‑Show** = 1 − (Reuniões Realizadas ÷ Agendamentos) · **CPRR** = Investimento ÷ Reuniões Realizadas
-- **Tx Venda** = Vendas ÷ Reuniões Realizadas · **CAC** = Investimento ÷ Vendas
-- **ROAS** = Faturamento ÷ Investimento · **Ticket** = Faturamento ÷ Vendas
-- Conversões acumuladas úteis: Lead→Agendamento, Lead→Reunião Realizada, Lead→Venda,
-  MQL→Reunião Realizada, MQL→Venda, Agendamento→Venda.
+- **CPM** = Investimento ÷ Impressões × 1000 · **CTR** = Cliques ÷ Impressões
+- **CPC** = Investimento ÷ Cliques
+- **ConvLP** = Visitas na LP ÷ Cliques · **CPV** = Investimento ÷ Visitas na LP
+- **Tx‑CHK** = Checkouts ÷ Visitas · **CPCHK** = Investimento ÷ Checkouts
+- **Tx‑Venda** = Vendas ÷ Checkouts · **Conv. Visita** = Vendas ÷ Visitas
+- **CAC** = Investimento ÷ Vendas · **Ticket** = Faturamento ÷ Vendas
+- **ROAS** = Faturamento ÷ Investimento · **Resultado** = Faturamento − Investimento
 
-Regra de ouro: **acumulativas somam** (impressões, cliques, leads, MQLs, gasto);
-**derivadas recalculam dos totais** (nunca some percentuais).
+O investimento considerado já inclui o imposto de mídia (`TAX_FACTOR`) quando o
+toggle está ligado — é o número que chega em `relatorios_dados.json`.
+
+Regra de ouro: **acumulativas somam** (impressões, cliques, visitas, checkouts,
+vendas, faturamento, gasto); **derivadas recalculam dos totais** (nunca some
+percentuais nem médias de CAC/ROAS).
 
 ## Princípio de interpretação
 
 Trate cada métrica como **diagnóstico probabilístico**, nunca regra absoluta.
 Uma métrica ruim raramente identifica sozinha a causa. Leia **sempre** com a etapa
 anterior e a posterior, o histórico, o **volume da amostra** e o **tempo de
-maturação**. O objetivo não é o menor CPL nem o maior volume de leads — é gerar
-leads qualificados que avancem no funil até a venda.
+maturação**. O objetivo não é o menor CPV nem o maior volume de visitas — é gerar
+vendas com CAC dentro da meta e ROAS que sustente a escala.
 
-**CPMQL, CPAG, CPRR, CAC e ROAS são resultados acumulados (efeito), não causas.**
+**CPV, CPCHK, CAC e ROAS são resultados acumulados (efeito), não causas.**
 Ao ver um deles ruim, aponte a **etapa** que perdeu eficiência — não recomende
-"reduzir o CAC/CPRR/ROAS" de forma abstrata.
+"reduzir o CAC" ou "aumentar o ROAS" de forma abstrata.
 
 ### Leitura por etapa (resumo)
+- **CPM**: preço do leilão/qualidade do criativo aos olhos do Meta. CPM subindo
+  com CTR estável costuma ser leilão/saturação de público, não criativo ruim.
 - **CTR** (Cliques/Impressões): interesse do criativo. CTR baixo **pode ser bom**
-  se qualifica melhor (CPMQL/CPRR/CAC saudáveis). Só é problema junto de custo ruim.
-- **CPL**: custo do cadastro. CPL alto pode ser saudável se gera mais MQL/reunião.
-  CPL baixo pode ser ruim se atrai gente fora do ICP.
-- **Tx MQL / CPMQL**: mídia+criativo+form atraindo o perfil certo (passou pelas
-  perguntas qualificatórias de renda). Tx alta com pouco volume pode ser
-  segmentação estreita ou critério permissivo — o MQL só vale se avançar para
-  agendamento, reunião realizada e venda.
-- **Tx Agendamento / CPAG**: qualidade do MQL + atratividade da oferta de
-  reunião + eficiência do comercial (tempo até 1º contato, taxa de contato,
-  tentativas, script de agendamento).
-- **No‑Show / CPRR**: compromisso do lead após agendar (lembrete, remarcação,
-  horário, valor percebido da reunião). **No‑Show é uma das principais métricas
-  operacionais** — reunião marcada e não realizada é dinheiro parado no meio do funil.
-- **Tx Venda / CAC / Ticket / ROAS**: qualidade real da oferta + pitch da reunião +
-  follow-up + maturação (venda high-ticket costuma fechar dias depois da reunião).
+  se qualifica melhor (CPV/CAC saudáveis). Só é problema junto de custo ruim.
+- **ConvLP** (Visitas ÷ Cliques): saúde técnica do caminho clique→página
+  (velocidade da LP, redirect, link quebrado). ConvLP muito abaixo da conta toda
+  é quase sempre problema técnico, não de oferta.
+- **CPV**: custo de colocar gente na página. É o melhor indicador **diário** de
+  eficiência de mídia num funil de venda direta — tem volume todo dia, ao
+  contrário do CAC.
+- **Tx‑CHK / CPCHK**: quanto da página vira intenção de compra. Queda aqui com
+  CPV estável aponta para **página/oferta/preço**, não para mídia.
+- **Tx‑Venda (Checkout→Venda)**: fricção do checkout (forma de pagamento, Pix não
+  pago, parcelamento). Muitos checkouts e poucas vendas = problema de pagamento
+  ou de confiança, não de tráfego.
+- **CAC / Ticket / ROAS**: resultado final. Ticket varia quando há order bump/
+  desconto — olhe o ticket antes de culpar o CAC.
 
 ### Heurísticas obrigatórias
-- CTR baixo + CPMQL/CPRR/CAC saudáveis → o anúncio qualifica melhor (não mexer).
-- CPL baixo + Tx MQL baixa → mídia atraindo fora do ICP.
-- Tx MQL boa + Tx Agendamento baixa → investigar **comercial**/disponibilidade/script
-  de agendamento, não o tráfego automaticamente.
-- Tx Agendamento boa + No‑Show alto → lembrete/confirmação/horário/remarcação —
-  o problema é entre marcar e comparecer, não a qualificação do lead.
-- Reunião Realizada boa (No‑Show baixo) + Tx Venda baixa → oferta/pitch/follow-up
-  da reunião (agenda cheia ≠ agenda qualificada).
-- CPMQL bom + CPAG ruim → perda entre qualificação e agendamento.
-- CPAG bom + No‑Show alto (CPRR ruim) → perda entre agendamento e comparecimento.
-- CPRR bom + CAC ruim → perda entre reunião realizada e venda.
-- Reunião/lançamento recente + ROAS baixo → verificar **maturação** antes de julgar.
-- Só uma campanha piorou → investigar a própria (segmentação/criativo), não geral.
+- CTR baixo + CAC/ROAS saudáveis → o anúncio qualifica melhor (não mexer).
+- CPV baixo + Tx‑CHK baixa → tráfego barato e fora da intenção de compra.
+- CPV bom + CPCHK ruim → perda na página (oferta/headline/preço).
+- CPCHK bom + CAC ruim → perda no checkout (pagamento, Pix não pago, parcelamento).
+- ConvLP despencando em todas as campanhas no mesmo dia → suspeite de **problema
+  técnico na LP ou de rastreamento**, não de criativo.
+- ROAS abaixo de 1 com volume baixo de vendas → verifique a **amostra** antes de
+  cortar: com ticket de ~R$ 300, uma venda a mais muda o CAC inteiro.
+- Só uma campanha piorou → investigue a própria (segmentação/criativo), não geral.
+- Venda tem **maturação**: compra pode cair horas depois do clique, então o dia
+  mais recente quase sempre subestima vendas/ROAS. Diga isso ao julgar "hoje".
 
 ## Top Anúncios e Piores Anúncios (o que a tabela já faz)
 
 A aba calcula sozinha, por anúncio (com gasto no período):
-- **Top**: ranqueado pelo **resultado mais profundo disponível** (Venda → Reunião
-  Realizada → Agendamento → MQL), maior volume + menor custo, **amostra relevante primeiro**.
-  Anúncio promissor **sem amostra suficiente** entra marcado **"Em observação"** —
-  nunca é "vencedor" só por 1 resultado com pouco gasto.
-- **Piores**: só anúncios com **investimento relevante** e resultado profundo
-  fraco / custo pior que a média; **nunca** por CTR/CPM/CPL isolados. Sem amostra
-  suficiente → **"Em observação"**, não "ruim".
-- Limiares em `build.py`: `SAMPLE_MIN_SPEND`, `SAMPLE_MIN_MQLS`, `TOP_ADS_N`.
-- **Link** abre o criativo (coluna opcional de permalink na aba de mídia →
-  `ad_links`).
+- **Ranking**: pelo **resultado mais profundo disponível** (Venda → Checkout →
+  Visita), maior volume + menor custo, **amostra relevante primeiro**. Anúncio
+  promissor **sem amostra suficiente** entra marcado **"Em observação"** — nunca
+  é "vencedor" só por 1 venda com pouco gasto.
+- **Anúncio ruim**: só com **investimento relevante** e resultado profundo fraco /
+  custo pior que a média; **nunca** por CTR/CPM isolados. Sem amostra suficiente
+  → **"Em observação"**, não "ruim".
+- Limiares em `build.py`: `SAMPLE_MIN_SPEND` (≈1 ticket), `SAMPLE_MIN_SALES`,
+  `TOP_ADS_N` — e o gestor pode sobrescrever os dois primeiros no painel de metas.
+- **Link** abre o criativo — coluna só aparece quando a aba de mídia tiver
+  permalink (`ad_links`).
 
 O texto deve **explicar** o ranking (por quê), não repeti-lo.
 
@@ -180,11 +178,11 @@ O texto deve **explicar** o ranking (por quê), não repeti-lo.
 `relatorios_dados.json` já traz `nota_saude` calculada por período
 (`relatorio_lib.funnel_health`, mesma metodologia sempre — nunca recalcule
 esse número na redação, só reporte/explique). Subnotas: **aquisição** (CPM/CTR
-vs. baseline de 30d), **conversão da página** (hoje sempre `null` — sem fonte
-de Page Views/ConvLP), **qualificação** (Tx‑MQL/CPMQL vs. meta ou baseline),
-**vendas** (hoje sempre `null` — sem fonte comercial), **consistência**
-(variação da Tx‑MQL entre janelas 7/14/30d) e **confiabilidade dos dados**
-(volume de MQLs vs. volume mínimo amostral). A nota geral é a média das
+vs. baseline de 30d), **conversão da página** (ConvLP vs. baseline),
+**checkout** (CPCHK vs. baseline; `null` quando não há coluna de Initiate
+Checkout), **vendas** (CAC vs. meta ou baseline), **retorno** (ROAS vs. meta ou
+baseline), **consistência** (variação do ROAS entre janelas 7/14/30d) e
+**confiabilidade dos dados** (volume de vendas vs. volume mínimo amostral). A nota geral é a média das
 subnotas disponíveis; quando alguma subnota é `null`, `provisoria=true` e
 `motivo` explica qual dado falta — **nunca trate a subnota ausente como 0**.
 Use a classificação textual já calculada (`classificacao`): Excelente (≥8) ·
@@ -220,12 +218,12 @@ Período: {periodo_range}
 Gasto: {gasto}
 CPM: {cpm}
 CTR: {ctr}
-Connect Rate: {connect_rate}
+CPC: {cpc}
 Conversão da LP: {conv_lp}
-Leads: {leads}
-CPL: {cpl}
-MQLs: {mqls}
-CPA/CPMQL: {cpa_cpmql}
+Visitas: {visitas}
+CPV: {cpv}
+Checkouts: {checkouts}
+Custo por checkout: {cpchk}
 Vendas: {vendas}
 Faturamento: {faturamento}
 CAC: {cac}
@@ -240,10 +238,10 @@ Principais ações:
 • …
 ```
 
-`CPA/CPMQL` é a nomenclatura oficial única (custo por MQL) — não crie um
-"CPA" separado. Campos sem fonte conectada (Connect Rate, Conversão da LP,
-Vendas, Faturamento, CAC, ROAS, Ticket médio) já chegam como **"Não
-disponível"** — mantenha assim, nunca escreva "R$ 0" nem um valor inventado.
+**CAC** é a nomenclatura oficial única do custo por venda — não crie um "CPA"
+separado. Campos sem fonte conectada (Checkouts e Custo por checkout, enquanto
+a planilha de mídia não tiver a coluna de Initiate Checkout) já chegam como
+**"Não disponível"** — mantenha assim, nunca escreva "R$ 0" nem invente valor.
 Em "Principais destaques"/"Principais ações" escreva 2–3 itens curtos (uma
 linha cada, sem explicação técnica) — é a única parte deste bloco que você
 redige; o resto é só template preenchido.
@@ -251,12 +249,12 @@ redige; o resto é só template preenchido.
 ### Quadrante 1 — Resumo executivo e saúde do funil (`quadro1_resumo`)
 
 - Nota de saúde (`<b>` + classificação + `provisoria`/`motivo` se houver).
-- Status das metas (CPMQL/CAC — meta ou "não definida").
-- Números do período (gasto, leads, MQLs, Tx‑MQL, CPL, CPA/CPMQL).
+- Status das metas (CAC/ROAS — meta ou "não definida").
+- Números do período (gasto, visitas, checkouts, vendas, CAC, ticket, ROAS).
 - **Mudanças vs. período anterior** — liste só variações com
   `material:true` em `comparativos.periodo_anterior.variacao` (evita ruído:
   oscilação abaixo do limiar não é notícia). Diferencie `delta_pp` (métricas
-  de taxa — CTR/ConvForm/Tx‑MQL) de `delta_pct` (as demais) — nunca confunda
+  de taxa — CTR/ConvLP/Tx‑CHK/Tx‑Venda) de `delta_pct` (as demais) — nunca confunda
   os dois no texto (ex.: "CTR caiu 0,5 **ponto percentual**", não "caiu 0,5%").
 - Principais destaques positivos / principais alertas (a partir das mesmas
   variações materiais).
@@ -265,16 +263,18 @@ redige; o resto é só template preenchido.
 
 ### Quadrante 2 — Diagnóstico do funil (`quadro2_diagnostico`)
 
-- Suficiência de amostra (compare `totais.mqls` com `volume_min_amostral`).
+- Suficiência de amostra (compare `totais.vendas` com `volume_min_amostral` e
+  `totais.spend` com `sample_min_spend`).
 - Melhoras relevantes / pioras relevantes / métricas estáveis (mesma lista de
   `variacao`, mas aqui você **explica o porquê provável**, não só lista).
 - Gargalos + hipóteses, no formato de `GUIA-INTERPRETACAO-METRICAS.md`: o que
   mudou → quanto → onde → hipóteses prováveis → evidência a favor → evidência
   contra → ação recomendada → prazo/condição de reavaliação. Trate como
   diagnóstico probabilístico, nunca certeza.
-- **Gargalo de dado (prioridade alta)** — enquanto Agendamentos/Reuniões/
-  Vendas/Faturamento não tiverem fonte conectada, este item aparece sempre,
-  separado dos gargalos de campanha.
+- **Gargalo de dado (prioridade alta)** — enquanto a planilha de mídia não
+  trouxer a coluna de Initiate Checkout (`has_checkout=false`), diga que a
+  etapa de checkout está cega e que Tx‑CHK/CPCHK não podem ser julgados;
+  este item aparece separado dos gargalos de campanha.
 
 ### Quadrante 3 — Campanhas, estruturas e anúncios campeões (`quadro3_campeoes`)
 
@@ -284,7 +284,7 @@ redige; o resto é só template preenchido.
   completo] · Conjunto: [nome completo] · Anúncio: [nome completo]` — nomes
   **nunca abreviados** (proibido usar reticências ou cortar nome).
 - Ranking das estruturas (`por_anuncio`, unidade = campanha+conjunto+anúncio)
-  por CPA/CPMQL, com volume ao lado (nunca declarar campeão com 1 MQL isolado
+  por CAC/ROAS, com volume ao lado (nunca declarar campeão com 1 venda isolada
   sem citar a amostra).
 - **Cada criativo em `criativos_consolidado` com `n_estruturas > 1`** recebe
   as DUAS análises exigidas: (a) consolidada — resultado total, quantas
@@ -317,25 +317,25 @@ estruturas). Formato: um `<h4>Veredito por estrutura</h4>` seguido de 3 `<ul>`
 (Campanhas / Conjuntos / Anúncios), cada item = **tag + nome completo (nunca
 abreviado) + números que justificam + 1 frase de razão**. Exemplos de item:
 
-- `<li><span class="tag escala">Escalar</span> <b>[campanha completa]</b> — CPMQL R$ X (meta R$ Y), Tx-MQL Z%, N MQLs/14d, tendência de queda no custo 3d seguidos. Melhor eficiência com amostra: subir orçamento no nível do conjunto/campanha (confirmar ABO/CBO no Gerenciador) +15%.</li>`
-- `<li><span class="tag corte">Cortar</span> <b>[conjunto completo]</b> — CPMQL R$ X = +48% acima da meta há N dias, gasto relevante, 0–1 MQL. Custo insustentável com amostra suficiente.</li>`
-- `<li><span class="tag observar">Observar</span> <b>[anúncio completo] (campanha · conjunto)</b> — só R$ X de gasto / N cliques, sem amostra. Falta: +M MQLs ou +K dias para decidir.</li>`
+- `<li><span class="tag escala">Escalar</span> <b>[campanha completa]</b> — CAC R$ X (meta R$ Y), Tx-Venda Z%, N vendas/14d, tendência de queda no custo 3d seguidos. Melhor eficiência com amostra: subir orçamento no nível do conjunto/campanha (confirmar ABO/CBO no Gerenciador) +15%.</li>`
+- `<li><span class="tag corte">Cortar</span> <b>[conjunto completo]</b> — CAC R$ X = +48% acima da meta há N dias, gasto relevante, 0–1 venda. Custo insustentável com amostra suficiente.</li>`
+- `<li><span class="tag observar">Observar</span> <b>[anúncio completo] (campanha · conjunto)</b> — só R$ X de gasto / N cliques, sem amostra. Falta: +M vendas ou +K dias para decidir.</li>`
 - Manter (sem tag própria no CSS — use `<b>Manter</b>`): `<li><b>Manter</b> <b>[estrutura]</b> — dentro da meta e estável em 7/14/30d; sem motivo para mexer.</li>`
 
 Régua dos cinco vereditos (aplique o **diagnóstico probabilístico** do
 `GUIA-INTERPRETACAO-METRICAS.md` — nunca uma métrica isolada):
 
-- **Escalar** — eficiência comprovada **com amostra** (CPMQL/CAC ≤ meta ou
+- **Escalar** — eficiência comprovada **com amostra** (CAC/ROAS ≤ meta ou
   melhor que a média da conta) **e** consistente em mais de uma janela
   (não só "hoje"). Diz o incremento (+10–20% a cada 3–4 dias).
 - **Manter** — dentro da meta e estável; mexer só adiciona risco. Sem ação.
 - **Otimizar** — resultado final ok mas há gargalo claro numa etapa (ex.: bom
-  volume de MQL, CPMQL subindo por Tx-MQL caindo) → aponte a etapa e a
+  volume de venda, CAC subindo por Tx-Venda caindo) → aponte a etapa e a
   verificação prática, não "melhore o CAC".
-- **Observar** — sem amostra suficiente (gasto/cliques/MQLs abaixo do mínimo)
+- **Observar** — sem amostra suficiente (gasto/cliques/vendas abaixo do mínimo)
   **ou** sinal recente ainda imaturo. Diga o que falta para virar decisão.
 - **Cortar** — custo pior que a meta/teto **com amostra suficiente e por N dias
-  seguidos**. **Sem meta definida (`meta_cpmql`/`meta_cac` = null) não existe
+  seguidos**. **Sem meta definida (`meta_cac`/`meta_roas` = null) não existe
   "Cortar" por custo** — rebaixe para Observar/Otimizar e explique que falta
   meta. Corte por criativo é por **ocorrência** (não global de um criativo
   vencedor em outras estruturas).
@@ -360,12 +360,12 @@ fazer primeiro), não uma segunda classificação. Regras:
 - **Escalar**: percentual/valor do incremento (regra: +10–20% a cada 3–4
   dias; alertar sobre resetar aprendizado em saltos maiores).
 - **Observar**: diga exatamente o que falta (dias, gasto, cliques, leads,
-  MQLs) para virar decisão.
+  vendas) para virar decisão.
 - **Otimizar/investigar**: relacione o gargalo a uma verificação prática
   (criativo, público, página, velocidade, rastreamento, API, formulário,
   comercial, oferta, distribuição de verba).
 - **Cortar**: local exato do corte (estrutura) e o critério numérico
-  ultrapassado. **Nunca corte sem meta/teto definido** — se `meta_cpmql` e
+  ultrapassado. **Nunca corte sem meta/teto definido** — se `meta_cac` e
   `meta_cac` forem `null`, esta lista fica vazia e o texto explica por quê.
 - **Produzir/testar**: anúncio de referência, o que variar, em qual
   estrutura, orçamento/limite do teste, critério de sucesso.
@@ -393,12 +393,13 @@ conflito e diga qual janela pesa mais para aquela decisão específica —
 nunca produza recomendações contraditórias sem justificar.
 
 ### Metas & parâmetros (painel editável da aba)
-O gestor preenche no topo da aba: **Meta CPMQL**, **Meta CAC**, **Volume mínimo
-amostral (MQLs)** e **N dias p/ corte**. Defaults em `build.py` (`META_CPMQL`,
-`META_CAC` = None → "não definida"; `VOLUME_MIN_AMOSTRAL`, `N_DIAS_CORTE`). As
-tabelas de anúncio **recoram CPMQL/CAC** vs meta (verde ≤ meta · amarelo até
-+30% · vermelho acima) e o badge **Em observação/Avaliável** usa o volume
-mínimo — tudo ao vivo. O texto dos Insights **cita a meta (ou "meta não
+O gestor preenche no topo da aba: **Meta CAC**, **Meta ROAS**, **Volume mínimo
+amostral (vendas)**, **Gasto mínimo amostral (R$)** e **N dias p/ corte**.
+Defaults em `build.py` (`META_CAC`, `META_ROAS` = None → "não definida";
+`VOLUME_MIN_AMOSTRAL`, `SAMPLE_MIN_SPEND`, `N_DIAS_CORTE`). As tabelas de anúncio
+**recoram CAC** (verde ≤ meta · amarelo até +30% · vermelho acima) e **ROAS**
+(escala invertida: maior é melhor), e o badge **Em observação/Avaliável** usa o
+volume e o gasto mínimos — tudo ao vivo. O texto dos Insights **cita a meta (ou "meta não
 definida")** e usa o volume mínimo/N dias configurados como critério das
 classificações.
 
@@ -415,7 +416,7 @@ dizer que o histórico serve só como benchmark). **Não invente**
 métricas/benchmarks; **não** trate ausência de dado como zero; **não** compare
 janelas de maturação diferentes; **não** penalize leads recentes ainda não
 trabalhados; **não** recomende cortar/escalar com amostra insuficiente; **não**
-culpe o tráfego por perda que acontece depois do MQL, nem o comercial se o MQL
+culpe o tráfego por perda que acontece depois do venda, nem o comercial se o venda
 estiver ruim.
 
 ## Economia de tokens (leia antes de redigir)
@@ -482,48 +483,53 @@ do cliente) são o alvo de estilo; adapte aos números do período, nunca copie
 literalmente nem invente estrutura que não está nos dados.
 
 - **CTR baixo pode ser bom.** "O CTR do anúncio X está abaixo da média, mas a
-  Tx-MQL, o CPMQL e as vendas estão saudáveis. O CTR menor indica comunicação
-  mais qualificadora, que filtra curiosos. Não vejo problema — manter."
+  Tx‑Venda, o CAC e o ROAS estão saudáveis. O CTR menor indica comunicação mais
+  qualificadora, que filtra curiosos. Não vejo problema — manter."
 - **Movimento generalizado ≠ problema de estrutura.** "O CPM subiu ~20% na
   maioria das campanhas. Alta generalizada = leilão mais caro (sazonalidade/
-  concorrência), não um criativo específico. Se CPMQL/CAC/ROAS seguem
-  saudáveis, não mexer agora."
-- **CPL é efeito, não causa.** "O CPL da campanha X está abaixo da média, mas
-  a Tx-MQL é muito inferior às demais: leads baratos e pouco qualificados. Não
-  escalar pelo CPL — revisar criativo, segmentação e perguntas do formulário."
-  E o inverso: "CPL acima da média, porém melhor Tx-MQL e menor CPMQL — o custo
-  maior é compensado pela qualidade. CPL alto não é gargalo aqui."
-- **CPMQL subindo: separe custo de qualidade.** "CPMQL da campanha X sobe há 3
-  dias. O CPL ficou estável e a Tx-MQL caiu — o problema é qualidade do lead,
-  não custo de captação. Revisar criativos/públicos que passaram a receber mais
-  verba."
-- **Baixo CPMQL isolado não autoriza escala.** "Conjunto XPTO tem CPMQL abaixo
-  da média, mas ainda sem vendas/etapas posteriores confirmando qualidade. Bom
-  custo inicial não basta — observar avanço comercial antes de escalar."
-  Contraste: "Conjunto com CPMQL baixo **e** etapas posteriores confirmando
-  qualidade → escalar +~20% e acompanhar se o volume se mantém sem deteriorar."
+  concorrência), não um criativo específico. Se CAC e ROAS seguem saudáveis,
+  não mexer agora."
+- **CPV é efeito, não causa.** "O CPV da campanha X está abaixo da média, mas a
+  Tx‑CHK é muito inferior às demais: visita barata e sem intenção de compra. Não
+  escalar pelo CPV — revisar criativo, público e promessa da LP." E o inverso:
+  "CPV acima da média, porém melhor Tx‑CHK e menor CAC — o custo maior é
+  compensado pela qualidade do tráfego. CPV alto não é gargalo aqui."
+- **CAC subindo: separe custo de conversão.** "CAC da campanha X sobe há 3 dias.
+  O CPV ficou estável e a Tx‑CHK caiu — o problema está na página/oferta, não no
+  custo de mídia. Revisar LP e públicos que passaram a receber mais verba."
+- **Checkout iniciado não é venda.** "Checkouts subiram 30% e as vendas ficaram
+  paradas: fricção no pagamento (Pix gerado e não pago, recusa de cartão), não
+  falta de tráfego. Olhar formas de pagamento antes de mexer em mídia."
+- **Baixo CPV isolado não autoriza escala.** "Conjunto XPTO tem CPV abaixo da
+  média, mas ainda sem venda confirmando qualidade. Bom custo de visita não
+  basta — observar até fechar amostra antes de escalar." Contraste: "Conjunto com
+  CPV baixo **e** vendas com CAC dentro da meta → escalar +~20% e acompanhar se o
+  volume se mantém sem deteriorar."
 - **Tendência de custo caindo + amostra → candidato a escala estruturada.**
-  "Anúncios XYZ com CAC/CPMQL abaixo da média e caindo há 3 dias, rodando numa
-  campanha só. Vale testá-los numa estrutura de escala (ex.: CBO com os
-  melhores), **preservando os anúncios originais** para não perder histórico."
+  "Anúncios XYZ com CAC abaixo da meta e caindo há 3 dias, rodando numa campanha
+  só. Vale testá-los numa estrutura de escala (ex.: CBO com os melhores),
+  **preservando os anúncios originais** para não perder histórico."
 - **Concentrar o diagnóstico.** "A piora está concentrada na campanha X; as
-  demais mantêm CTR/CPMQL/CAC estáveis. Atuar só na X — evitar mudança geral que
+  demais mantêm CTR/CAC/ROAS estáveis. Atuar só na X — evitar mudança geral que
   prejudica estrutura saudável." Versus generalizado: "Piora em praticamente
   todas as estruturas ao mesmo tempo → menos provável ser 1 criativo/público;
-  verificar fatores gerais (formulário, CRM, critério de MQL, integrações)."
-- **Queda de volume por menos verba ≠ novo gargalo.** "MQLs caíram, mas CPL,
-  ConvForm e Tx-MQL seguem estáveis — é consequência direta da queda de
+  verificar fatores gerais (LP fora do ar, rastreamento de UTM, checkout)."
+- **Queda de volume por menos verba ≠ novo gargalo.** "Vendas caíram, mas CPV,
+  ConvLP e Tx‑Venda seguem estáveis — é consequência direta da queda de
   investimento, não uma quebra no funil."
-- **Escala com perda parcial de eficiência pode ser aceitável.** "Vendas
-  subiram e o CAC também. Ganho de escala com perda parcial de eficiência —
-  seguir escalando depende de margem, Ticket, ROAS e teto aceitável de CAC."
-- **Maturação em High Ticket.** "ROAS do período abaixo da meta, mas há MQLs
-  recentes ainda em atendimento e o ciclo é longo — parte da receita não foi
-  reconhecida. Avaliar por coorte antes de concluir deterioração."
-- **Gargalo de dado (obrigatório enquanto faltar fonte comercial).** Como este
-  cliente ainda não tem Agendamentos/Reuniões/Show Rate conectados, sempre que
-  o raciocínio depender dessas etapas, **não invente** — escreva que o dado
-  falta e que a leitura fica limitada até conectar a lista do comercial.
+- **Escala com perda parcial de eficiência pode ser aceitável.** "Vendas subiram
+  e o CAC também. Ganho de escala com perda parcial de eficiência — seguir
+  escalando depende de margem, ticket, ROAS e teto aceitável de CAC."
+- **Amostra pequena com ticket alto.** "Com ticket de ~R$ 300 e 3 vendas no
+  período, uma venda a mais ou a menos muda o CAC em dezenas de reais. Antes de
+  cortar, diga explicitamente que a amostra é curta."
+- **Venda do dia corrente ainda amadurece.** "O ROAS de hoje está abaixo do
+  período, mas a compra pode cair horas depois do clique — o dia mais recente
+  quase sempre subestima vendas. Não tratar como deterioração."
+- **Gargalo de dado (obrigatório quando faltar a coluna de checkout).** Enquanto
+  `has_checkout=false`, a etapa de checkout está cega: sempre que o raciocínio
+  depender de Tx‑CHK/CPCHK, **não invente** — escreva que o dado falta e que a
+  leitura fica limitada até o Adveronix exportar a coluna.
 
 Regra de ouro do tom: cada insight = **o que aconteceu → por que provavelmente
 → o que fazer (ou por que não fazer nada)**. Se os dados não sustentam uma

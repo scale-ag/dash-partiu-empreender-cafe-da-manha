@@ -15,7 +15,7 @@ aconteceram). O código-fonte canônico e completo está em **`build/template.ht
 Google Sheets (2+ abas)  --export CSV público-->  build/build.py  (Python, só stdlib)
         │                                                 │ lê, limpa, qualifica, mascara PII
         │                                                 ▼
-        │                                    injeta REGISTROS BRUTOS (leads[]/meta[]) em JSON
+        │                                    injeta REGISTROS BRUTOS (meta[]/sales[]) em JSON
         │                                                 ▼
         └──────────────────────────────────────>  build/template.html  → dist/index.html
                                                           │  (todo cálculo/filtro/gráfico é no navegador)
@@ -46,7 +46,7 @@ Responsabilidades (stdlib apenas — `urllib`, `csv`, `json`, `re`):
 - `to_float` (aceita `R$ 1.234,56`), `parse_date` (vários formatos → `YYYY-MM-DD`).
 - `is_qualified(bucket)` — **o critério do relatório** (ex.: faturamento ≥ um valor mínimo).
 - `mask_email` / `mask_phone` / `first_last_initial` — **mascara PII** (a página é pública).
-- Emite `{"build":{...}, "leads":[...], "meta":[...]}` e substitui os placeholders
+- Emite `{"build":{...}, "meta":[...], "sales":[...]}` e substitui os placeholders
   `__DATA_JSON__`, `__BUILD_ID__`, `__GENERATED_BRT__` no template.
 
 Registro de lead: `{d,src,plat,camp,adset,ad,prof,bucket,q,utm,nm,em,ph}`.
@@ -107,7 +107,7 @@ const taxf = ()=> STATE.tax ? TAX : 1;     // imposto Meta
 function dateActive(d){ if(!d) return false;
   if(STATE.selDays.size) return STATE.selDays.has(d);
   return (!STATE.from||d>=STATE.from) && (!STATE.to||d<=STATE.to); }
-const leadsActive=()=>LEADS.filter(l=>dateActive(l.d));
+const salesActive=()=>SALES.filter(s=>dateActive(s.d));
 const metaActive =()=>META.filter(m=>dateActive(m.d));
 ```
 
@@ -116,14 +116,14 @@ todo período` — cada um devolve `[from,to]` calculado a partir de `B.today`.
 
 **Agregação** (reconstrói SEMPRE da fonte filtrada — nunca tabela-de-tabela):
 ```js
-function buildAgg(fL,fM,dim){ const m={}, g=k=>m[k]||(m[k]={sp:0,im:0,cl:0,leads:0,mqls:0});
+function buildAgg(fM,fS,dim){ const m={}, g=k=>m[k]||(m[k]={sp:0,im:0,cl:0,pv:0,chk:0,vendas:0,fat:0});
   fM.forEach(r=>{const a=g(r[dim]); a.sp+=r.sp; a.im+=r.im; a.cl+=r.cl;});
-  fL.forEach(r=>{const a=g(r[dim]); a.leads+=1; a.mqls+=r.q;}); return m; }
+  fS.forEach(r=>{const a=g(r[dim]); a.vendas+=r.vendas; a.fat+=r.fat;}); return m; }
 function derive(a){ const g=a.sp*taxf(); return { gasto:g, cpm:a.im?g/a.im*1000:null,
-  ctr:a.im?a.cl/a.im:null, cpc:a.cl?g/a.cl:null, convf:a.cl?a.leads/a.cl:null,
-  cpl:a.leads?g/a.leads:null, cpmql:a.mqls?g/a.mqls:null, tx:a.leads?a.mqls/a.leads:null, ...a }; }
+  ctr:a.im?a.cl/a.im:null, cpc:a.cl?g/a.cl:null, convlp:a.cl?a.pv/a.cl:null,
+  cpv:a.pv?g/a.pv:null, cpchk:a.chk?g/a.chk:null, cac:a.vendas?g/a.vendas:null, ...a }; }
 ```
-Regra de ouro: **métricas acumulativas somam** (impr, cliques, leads, gasto…);
+Regra de ouro: **métricas acumulativas somam** (impr, cliques, visitas, vendas, gasto…);
 **derivadas recalculam dos totais** (CTR=cliques/impr etc.) — nunca somar percentuais.
 
 ---
@@ -134,7 +134,7 @@ Cada tabela hierárquica é montada de um **escopo que exclui a própria dimens�
 que as linhas irmãs continuem visíveis e o usuário possa **Ctrl+clicar várias** (OR):
 
 ```js
-function metaScope(ex){ let fL=leadsActive().filter(l=>l.src==='meta'), fM=metaActive();
+function metaScope(ex){ let fM=metaActive(), fS=salesActive();
   if(ex!=='C'&&STATE.mSelC.size){ fL=fL.filter(r=>STATE.mSelC.has(r.camp)); fM=fM.filter(r=>STATE.mSelC.has(r.camp)); }
   if(ex!=='A'&&STATE.mSelA.size){ fL=fL.filter(r=>STATE.mSelA.has(r.adset)); fM=fM.filter(r=>STATE.mSelA.has(r.adset)); }
   if(ex!=='D'&&STATE.mSelAd.size){ fL=fL.filter(r=>STATE.mSelAd.has(r.ad)); fM=fM.filter(r=>STATE.mSelAd.has(r.ad)); }
@@ -178,7 +178,7 @@ Recursos implementados (ver `renderTable` em `template.html`):
   métricas `nowrap` à direita, nulo = `-`.
 
 Ordem de colunas das tabelas de resultado (padrão do cliente):
-`Data · Dia · Gasto · CPM · CTR · ConvForm(Leads/Cliques) · Leads · CPL · Tx‑MQL · MQLs · CPMQL`
+`Data · Dia · Gasto · CPM · CTR · Cliques · CPC · Visitas · ConvLP · CPV · Vendas · CAC · Ticket · Fat. · ROAS`
 (nas hierárquicas troca Data/Dia pela dimensão). **Tabela diária: último dia no topo**
 (`daily(...).reverse()`).
 
@@ -186,12 +186,13 @@ Ordem de colunas das tabelas de resultado (padrão do cliente):
 
 ## 7. Gráficos (Chart.js 4, via CDN)
 
-- **Combinado diário** (`comboChart`): barras Leads/MQLs no eixo `y` + linhas
-  Gasto(vermelha)/CPL(preta=`cink()`)/CPMQL(amarela) no eixo `y1` (R$). É o único
+- **Combinado diário** (`comboChart`): barras Visitas/Checkouts no eixo `y`,
+  Vendas em eixo próprio invisível (`y2`) + linhas Gasto(vermelha)/CAC(amarela)
+  no eixo `y1` (R$). É o único
   lugar com 2 eixos, por exigência do cliente.
 - **Barras horizontais** (`hbar`): Top N, rótulo de valor no fim da barra (plugin
   `barLabels`), nomes completos (regra: nunca truncar; Top 10 em vez de cortar).
-- **Par Tabela+Gráfico** (`lineChart`): linha de CPMQL/CPL por dia **colada** logo
+- **Par Tabela+Gráfico** (`cpvByDimChart`): linha de CPV por dia **colada** logo
   abaixo de cada tabela hierárquica (`.table-chart-pair`, zero gap), refletindo o filtro.
 - Cores de texto/grade lidas do tema (`cmuted/cink/cgrid`) e re-render ao trocar tema.
 
