@@ -1,6 +1,6 @@
 {
-  "generated_at": "21/09/2026 19:32",
-  "generated_at_iso": "2026-09-21T19:32:49.925227-03:00",
+  "generated_at": "21/09/2026 19:34",
+  "generated_at_iso": "2026-09-21T19:34:14.024245-03:00",
   "fonte": "Números brutos agregados a partir do funil de venda direta (Meta Ads × Compradores) — insumo para a Routine do Claude escrever build/relatorios.json (Insights de Tráfego). Sem interpretação/texto aqui, só aritmética.",
   "params": {
     "tax_factor": 1.13806,
@@ -3405,16 +3405,16 @@
         }
       ],
       "nota_saude": {
-        "nota": 9.1,
+        "nota": 7.2,
         "provisoria": false,
-        "classificacao": "Excelente",
+        "classificacao": "Saudável, com atenção",
         "motivo": "",
         "subnotas": {
           "aquisicao": 9.4,
           "conversao_pagina": 9.8,
           "checkout": 10.0,
-          "vendas": 9.5,
-          "retorno": 7.9,
+          "vendas": 0.0,
+          "retorno": 4.0,
           "consistencia": 7.3,
           "confiabilidade_dados": 10.0
         }
@@ -3436,7 +3436,7 @@
         "cac": "R$ 665,53",
         "roas": "0,40x",
         "ticket_medio": "R$ 267,30",
-        "saude_funil": "9.1/10 — Excelente"
+        "saude_funil": "7.2/10 — Saudável, com atenção"
       },
       "comparativos": {
         "7d": {
@@ -4865,16 +4865,16 @@
         }
       ],
       "nota_saude": {
-        "nota": 9.5,
+        "nota": 7.7,
         "provisoria": false,
-        "classificacao": "Excelente",
+        "classificacao": "Saudável, com atenção",
         "motivo": "",
         "subnotas": {
           "aquisicao": 9.7,
           "conversao_pagina": 9.8,
           "checkout": 10.0,
-          "vendas": 10.0,
-          "retorno": 10.0,
+          "vendas": 1.9,
+          "retorno": 5.5,
           "consistencia": 7.3,
           "confiabilidade_dados": 10.0
         }
@@ -4896,7 +4896,7 @@
         "cac": "R$ 570,06",
         "roas": "0,55x",
         "ticket_medio": "R$ 315,12",
-        "saude_funil": "9.5/10 — Excelente"
+        "saude_funil": "7.7/10 — Saudável, com atenção"
       },
       "comparativos": {
         "7d": {
@@ -6622,16 +6622,16 @@
         }
       ],
       "nota_saude": {
-        "nota": 9.6,
+        "nota": 7.5,
         "provisoria": false,
-        "classificacao": "Excelente",
+        "classificacao": "Saudável, com atenção",
         "motivo": "",
         "subnotas": {
           "aquisicao": 10.0,
           "conversao_pagina": 10.0,
           "checkout": 10.0,
-          "vendas": 10.0,
-          "retorno": 10.0,
+          "vendas": 0.3,
+          "retorno": 5.1,
           "consistencia": 7.3,
           "confiabilidade_dados": 10.0
         }
@@ -6653,7 +6653,7 @@
         "cac": "R$ 631,92",
         "roas": "0,51x",
         "ticket_medio": "R$ 320,43",
-        "saude_funil": "9.6/10 — Excelente"
+        "saude_funil": "7.5/10 — Saudável, com atenção"
       },
       "comparativos": {
         "7d": {
@@ -8503,16 +8503,16 @@
         }
       ],
       "nota_saude": {
-        "nota": 9.6,
+        "nota": 7.5,
         "provisoria": false,
-        "classificacao": "Excelente",
+        "classificacao": "Saudável, com atenção",
         "motivo": "",
         "subnotas": {
           "aquisicao": 10.0,
           "conversao_pagina": 10.0,
           "checkout": 10.0,
-          "vendas": 10.0,
-          "retorno": 10.0,
+          "vendas": 0.3,
+          "retorno": 5.1,
           "consistencia": 7.3,
           "confiabilidade_dados": 10.0
         }
@@ -8534,7 +8534,7 @@
         "cac": "R$ 631,92",
         "roas": "0,51x",
         "ticket_medio": "R$ 320,43",
-        "saude_funil": "9.6/10 — Excelente"
+        "saude_funil": "7.5/10 — Saudável, com atenção"
       },
       "comparativos": {
         "7d": {
@@ -10717,16 +10717,16 @@
         }
       ],
       "nota_saude": {
-        "nota": 9.6,
+        "nota": 7.5,
         "provisoria": false,
-        "classificacao": "Excelente",
+        "classificacao": "Saudável, com atenção",
         "motivo": "",
         "subnotas": {
           "aquisicao": 10.0,
           "conversao_pagina": 10.0,
           "checkout": 10.0,
-          "vendas": 10.0,
-          "retorno": 10.0,
+          "vendas": 0.3,
+          "retorno": 5.1,
           "consistencia": 7.3,
           "confiabilidade_dados": 10.0
         }
@@ -10748,7 +10748,7 @@
         "cac": "R$ 631,92",
         "roas": "0,51x",
         "ticket_medio": "R$ 320,43",
-        "saude_funil": "9.6/10 — Excelente"
+        "saude_funil": "7.5/10 — Saudável, com atenção"
       },
       "comparativos": {
         "7d": {
