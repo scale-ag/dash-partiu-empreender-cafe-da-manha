@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build dashboard (le as planilhas via CSV publico, somente leitura)
+      - name: Build dashboard (le as 2 planilhas via CSV publico, somente leitura)
         run: python build/build.py --out dist/index.html
 
       - name: Add .nojekyll

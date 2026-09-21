@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Funções puras de datas/agregação compartilhadas entre `gerar_relatorios.py`
-(fallback manual, determinístico) e `coletar_dados_relatorio.py` (coleta de
-números para a Routine do Claude escrever os Insights). Nenhuma lógica de
-texto/interpretação mora aqui — só aritmética sobre os registros brutos de
-`build.py` (`leads[]`/`meta[]`).
+Funções puras de datas/agregação usadas por `coletar_dados_relatorio.py`
+(coleta de números para a Routine do Claude escrever os Insights). Nenhuma
+lógica de texto/interpretação mora aqui — só aritmética sobre os registros
+brutos de `build.py` (`meta[]`/`sales[]`), no mesmo funil de venda direta do
+dashboard: Gasto → Impressões → Cliques → Visitas na LP → Checkouts → Vendas.
 """
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def in_range(row_date: str | None, start: date, end: date) -> bool:
     return start <= rd <= end
 
 
-def agg(meta: list[dict], leads: list[dict], start: date, end: date, camp: str | None = None,
+def agg(meta: list[dict], sales: list[dict], start: date, end: date, camp: str | None = None,
         adset: str | None = None, ad: str | None = None) -> dict:
     def keep(r):
         if not in_range(r["d"], start, end):
@@ -85,24 +85,35 @@ def agg(meta: list[dict], leads: list[dict], start: date, end: date, camp: str |
         return True
 
     m = [r for r in meta if keep(r)]
-    l = [r for r in leads if keep(r)]
+    s = [r for r in sales if keep(r)]
     spend = sum(r["sp"] for r in m) * bp.TAX_FACTOR
-    impr = sum(r["im"] for r in m)
-    clicks = sum(r["cl"] for r in m)
-    n_leads = len(l)
-    n_mqls = sum(r["q"] for r in l)
-    return {"spend": spend, "impr": impr, "clicks": clicks, "leads": n_leads, "mqls": n_mqls}
+    return {
+        "spend": spend,
+        "impr": sum(r["im"] for r in m),
+        "clicks": sum(r["cl"] for r in m),
+        "vis": sum(r["pv"] for r in m),
+        "chk": sum(r.get("ck", 0) for r in m),
+        "vendas": sum(r.get("vendas", 0) for r in s),
+        "fat": sum(r.get("fat", 0.0) for r in s),
+    }
 
 
 def derived(a: dict) -> dict:
-    spend, impr, clicks, leads, mqls = a["spend"], a["impr"], a["clicks"], a["leads"], a["mqls"]
+    spend, impr, clicks = a["spend"], a["impr"], a["clicks"]
+    vis, chk, vendas, fat = a["vis"], a["chk"], a["vendas"], a["fat"]
     return {
         "cpm": (spend / impr * 1000) if impr else None,
         "ctr": (clicks / impr) if impr else None,
-        "cpl": (spend / leads) if leads else None,
-        "convform": (leads / clicks) if clicks else None,
-        "txmql": (mqls / leads) if leads else None,
-        "cpmql": (spend / mqls) if mqls else None,
+        "cpc": (spend / clicks) if clicks else None,
+        "convlp": (vis / clicks) if clicks else None,   # visitas na LP / cliques
+        "cpv": (spend / vis) if vis else None,          # custo por visita
+        "txchk": (chk / vis) if vis else None,          # visitas que iniciaram checkout
+        "cpchk": (spend / chk) if chk else None,        # custo por checkout iniciado
+        "txvenda": (vendas / chk) if chk else None,     # vendas / checkouts
+        "convvis": (vendas / vis) if vis else None,     # vendas / visitas
+        "cac": (spend / vendas) if vendas else None,
+        "roas": (fat / spend) if spend else None,
+        "ticket": (fat / vendas) if vendas else None,
         **a,
     }
 
@@ -153,7 +164,7 @@ def previous_period(key: str, start: date, end: date, today: date,
     return p_start, p_end, "período imediatamente anterior, mesma duração"
 
 
-RATE_METRICS = {"ctr", "convform", "txmql"}
+RATE_METRICS = {"ctr", "convlp", "txchk", "txvenda", "convvis"}
 MATERIAL_PCT = 0.10     # variação relativa mínima p/ considerar mudança relevante
 MATERIAL_PP = 0.03      # variação em pontos percentuais mínima p/ métricas de taxa
 
@@ -162,8 +173,9 @@ def compare(cur: dict, prev: dict | None) -> dict:
     """Compara duas agregações `derived()` métrica a métrica. Só marca
     `material=True` quando a variação passa os limiares mínimos — evita
     listar oscilações irrelevantes como se fossem alerta (regra §7)."""
-    metrics = ["spend", "impr", "clicks", "leads", "mqls", "cpm", "ctr", "cpl",
-               "convform", "txmql", "cpmql"]
+    metrics = ["spend", "impr", "clicks", "vis", "chk", "vendas", "fat",
+               "cpm", "ctr", "cpc", "convlp", "cpv", "txchk", "cpchk",
+               "txvenda", "convvis", "cac", "roas", "ticket"]
     out = {}
     for m in metrics:
         cv, pv = cur.get(m), (prev or {}).get(m)
@@ -174,7 +186,7 @@ def compare(cur: dict, prev: dict | None) -> dict:
             row["delta_pct"] = round((cv - pv) / pv, 4) if pv else None
             if m in RATE_METRICS:
                 row["delta_pp"] = round((cv - pv) * 100, 2)
-            higher_is_better = m not in ("spend", "cpm", "cpl", "cpmql")
+            higher_is_better = m not in ("spend", "cpm", "cpc", "cpv", "cpchk", "cac")
             if abs(cv - pv) < 1e-9:
                 row["direcao"] = "estavel"
             else:
@@ -212,11 +224,12 @@ def _classificacao(nota: float) -> str:
     return "Crítico grave"
 
 
-def funnel_health(cur: dict, baseline: dict, meta_cpmql, meta_cac,
+def funnel_health(cur: dict, baseline: dict, meta_cac, meta_roas,
                    volume_min: int, sample_windows: list[dict]) -> dict:
     """`cur` e `baseline` são dicts `derived()` do período atual e de uma
     janela de referência (normalmente 30d). `sample_windows` é uma lista de
-    dicts `derived()` (ex.: 7d/14d/30d) usada para medir consistência."""
+    dicts `derived()` (ex.: 7d/14d/30d) usada para medir consistência.
+    Funil de venda direta: aquisição → página → checkout → venda."""
     sub = {}
 
     # Aquisição: custo de mídia (CPM) e capacidade de gerar clique (CTR) vs.
@@ -228,36 +241,55 @@ def funnel_health(cur: dict, baseline: dict, meta_cpmql, meta_cac,
     else:
         sub["aquisicao"] = None
 
-    # Conversão da página: sem fonte de Page Views/ConvLP conectada ao dashboard.
-    sub["conversao_pagina"] = None
-
-    # Qualificação: TxMQL/CPMQL vs. meta (se definida) ou vs. baseline da conta.
-    if cur.get("cpmql") is not None:
-        ref = meta_cpmql if meta_cpmql is not None else baseline.get("cpmql")
-        if ref:
-            cpmql_var = (cur["cpmql"] - ref) / ref
-            sub["qualificacao"] = round(_clamp(10 - cpmql_var * 10), 1)
-        else:
-            sub["qualificacao"] = None
+    # Conversão da página: ConvLP (visitas/cliques) vs. baseline da conta.
+    if cur.get("convlp") is not None and baseline.get("convlp"):
+        convlp_var = (cur["convlp"] - baseline["convlp"]) / baseline["convlp"]
+        sub["conversao_pagina"] = round(_clamp(10 + convlp_var * 10), 1)
     else:
-        sub["qualificacao"] = None
+        sub["conversao_pagina"] = None
 
-    # Vendas: sem fonte comercial (agendamentos/reuniões/vendas) conectada.
-    sub["vendas"] = None
+    # Checkout: custo por checkout iniciado vs. baseline (só existe quando a
+    # planilha de mídia traz a coluna de Initiate Checkout).
+    if cur.get("cpchk") is not None and baseline.get("cpchk"):
+        cpchk_var = (cur["cpchk"] - baseline["cpchk"]) / baseline["cpchk"]
+        sub["checkout"] = round(_clamp(10 - cpchk_var * 10), 1)
+    else:
+        sub["checkout"] = None
 
-    # Consistência: quanto a Tx-MQL varia entre as janelas de amostra (7/14/30d)
+    # Vendas: CAC vs. meta (se definida) ou vs. baseline da conta.
+    if cur.get("cac") is not None:
+        ref = meta_cac if meta_cac is not None else baseline.get("cac")
+        if ref:
+            cac_var = (cur["cac"] - ref) / ref
+            sub["vendas"] = round(_clamp(10 - cac_var * 10), 1)
+        else:
+            sub["vendas"] = None
+    else:
+        sub["vendas"] = None
+
+    # Retorno: ROAS vs. meta (se definida) ou vs. baseline da conta.
+    if cur.get("roas") is not None:
+        ref = meta_roas if meta_roas is not None else baseline.get("roas")
+        if ref:
+            sub["retorno"] = round(_clamp(10 * cur["roas"] / ref), 1)
+        else:
+            sub["retorno"] = None
+    else:
+        sub["retorno"] = None
+
+    # Consistência: quanto o ROAS varia entre as janelas de amostra (7/14/30d)
     # — baixa variação = leitura mais confiável entre janelas.
-    txmqls = [w["txmql"] for w in sample_windows if w.get("txmql") is not None]
-    if len(txmqls) >= 2 and max(txmqls) > 0:
-        spread = (max(txmqls) - min(txmqls)) / max(txmqls)
+    roases = [w["roas"] for w in sample_windows if w.get("roas") is not None]
+    if len(roases) >= 2 and max(roases) > 0:
+        spread = (max(roases) - min(roases)) / max(roases)
         sub["consistencia"] = round(_clamp(10 - spread * 10), 1)
     else:
         sub["consistencia"] = None
 
-    # Confiabilidade dos dados: volume de MQLs no período vs. volume mínimo
+    # Confiabilidade dos dados: volume de VENDAS no período vs. volume mínimo
     # amostral configurado no painel da aba Relatório.
-    mqls = cur.get("mqls") or 0
-    sub["confiabilidade_dados"] = round(_clamp(10 * mqls / volume_min if volume_min else 10), 1)
+    vendas = cur.get("vendas") or 0
+    sub["confiabilidade_dados"] = round(_clamp(10 * vendas / volume_min if volume_min else 10), 1)
 
     disponiveis = {k: v for k, v in sub.items() if v is not None}
     if not disponiveis:

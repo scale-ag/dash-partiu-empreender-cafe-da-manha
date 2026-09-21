@@ -1,272 +1,213 @@
-# CLAUDE.md — Contexto do projeto (TEMPLATE High Ticket)
+# CLAUDE.md — Contexto do projeto (Rogerio · Café da Manhã)
 
 > Este arquivo é lido automaticamente pelo Claude Code ao abrir o repositório.
 > Ele carrega TODO o contexto necessário para continuar o trabalho sem depender
 > de mensagens anteriores. Mantenha-o atualizado.
 >
-> **Este é um TEMPLATE limpo.** Todos os valores específicos do cliente estão
-> marcados como `<<PREENCHER: descrição>>`. Siga o CHECKLIST abaixo para
-> configurar um cliente novo.
-
----
-
-## ✅ CHECKLIST DE NOVO CLIENTE (fazer em ordem)
-
-Preencha cada `<<PREENCHER: …>>` do repositório. Ordem sugerida:
-
-1. **`build/build.py` — constantes do topo:**
-   - `SPREADSHEET_ID` — ID da planilha central do Google Sheets do cliente.
-   - `GID_CONVERSAS` — gid da aba de Conversas (fonte principal de leads).
-   - `GID_LEADS` — gid da aba de Leads legado (popup/form; só contada).
-   - `GID_META` — gid da aba Meta Ads.
-   - `GID_SALES` — gid da aba de Compradores (New Subscriptions).
-   - `CLIENT_NAME`, `MAIN_PRODUCT` — nome do cliente e da oferta principal.
-   - `MAIN_PRODUCT_PREFIX` — prefixo comum às campanhas do cliente.
-   - `TAX_FACTOR` — fator de imposto/taxa da mídia paga (Meta Ads). **Default do
-     template: `1.13806`** (13,806%) — já vem pronto para todo cliente novo;
-     só ajuste se o cliente tiver um fator diferente, ou use `1.0` se não
-     houver imposto.
-2. **`build/build.py` — critério de MQL:** ajuste `is_medico()` e os aliases da
-   coluna de qualificação em `process()` (`"medico": [...]` + índice de fallback)
-   ao critério e ao cabeçalho da aba Conversas do cliente.
-3. **`build/app.js`:** revisar os rótulos fixos de UI que citam o critério de MQL
-   ("MQLs (...)") e o agrupamento de "faixa"/especialidade — o critério de
-   `build.py` não propaga sozinho para esses textos.
-4. **`build/template.html`:** preencher `<title>` e o logo (`logo-main`/`logo-sub`)
-   com o nome/slogan do cliente. (Opcional: trocar o favicon base64.)
-5. **`build/identidade-visual.css`:** ajustar cores se o cliente tiver identidade
-   própria (opcional — o default funciona).
-6. **`README.md` / `SETUP-CRON.md` / este `CLAUDE.md` / `AGENTS.md`:** owner/repo
-   do GitHub, URL do GitHub Pages, nome do cliente, planilha/gids.
-7. **`build/GUIA-RELATORIOS.md`:** preencher o "Contexto do funil" (cliente,
-   oferta, critério de MQL).
-8. **GitHub Pages + Actions:** confirmar que `build/` + `.github/workflows/deploy.yml`
-   estão na `main` (ativa `workflow_dispatch`); rodar o workflow uma vez.
-9. **cron-job.org:** seguir `SETUP-CRON.md` — token fine-grained novo (Actions:
-   read/write, só neste repo), nunca reaproveitar um token exposto em chat.
-10. **Insights de Tráfego (opcional):** `build/relatorios.json` e
-    `build/relatorios_dados.json` começam vazios (`{}`). Para ativar os Insights:
-    - deixar a Routine do Actions `briefing.yml` rodar (gera `relatorios_dados.json`
-      com os números), e
-    - criar a **Routine do Claude** (`create_trigger` apontando para este repo)
-      que lê os números + os 2 guias e escreve `relatorios.json` na `main`
-      (ver "Briefing automático" abaixo). **Não vem pronta** — precisa ser
-      recriada por cliente.
-11. **Testar local** com CSVs de amostra antes de publicar (3 páginas, tema
-    claro/escuro, multi-seleção).
-
-> **Fora do escopo deste template:** não há Cloudflare Worker nem chamada paga à
-> API da Anthropic no pipeline. A automação de Insights é feita por Routine
-> agendada do Claude Code (item 10). Se o cliente precisar de outra camada, é
-> desenvolvimento novo.
+> Este repositório **já está configurado** para o cliente (nasceu do template
+> High Ticket, mas foi convertido para um funil de venda direta). Todos os
+> marcadores de template foram preenchidos.
 
 ---
 
 ## O que é
 
-Dashboard de **Captura de Leads** — um app de BI estático (HTML/CSS/JS
-puro + Chart.js via CDN) publicado no **GitHub Pages**, que cruza a lista de
-**Leads** com o gerenciador de mídia paga e se atualiza sozinho a cada ~30 min
-(build 100% na nuvem via GitHub Actions, disparado externamente pelo cron-job.org).
+Dashboard de **tráfego pago** do funil **Perpétuo** (venda direta) do produto
+*Café da Manhã Lucrativo* — um app de BI estático (HTML/CSS/JS puro + Chart.js
+via CDN) publicado no **GitHub Pages**, que cruza o gerenciador de mídia paga
+com a planilha de Compradores e se atualiza sozinho a cada ~30 min (build 100%
+na nuvem via GitHub Actions, disparado externamente pelo cron-job.org).
 
-- **URL pública:** `https://<<PREENCHER: owner do GitHub>>.github.io/<<PREENCHER: nome do repositório>>/`
+- **Cliente/projeto:** Rogerio · **Subtítulo:** Café da Manhã · **Funil:** Perpétuo
+- **URL pública:** https://scale-ag.github.io/dash-partiu-empreender-cafe-da-manha/
+- **Repositório:** `scale-ag/dash-partiu-empreender-cafe-da-manha`
 - **Somente leitura** das planilhas. Nunca escrever de volta.
 
-## Fontes de dados (Google Sheets)
+### Diferença essencial para o template original
+O template foi feito para captação de leads High Ticket (Conversas → MQL →
+venda). **Aqui não existe lead nem MQL**: é venda direta. O funil é
 
-Spreadsheet ID: `<<PREENCHER: SPREADSHEET_ID>>` ("<<PREENCHER: nome da planilha central>>").
+```
+Gasto → Impressões → Cliques no link → Visitas na LP → Checkouts iniciados → Vendas → Faturamento
+```
 
-| Aba | gid | Colunas usadas |
-|-----|-----|----------------|
-| **Conversas** (fonte principal — webhook de mensageria/WhatsApp) | `<<PREENCHER: GID_CONVERSAS>>` | `Data` · `Mensagem` · `Nome` · `Telefone` · coluna de MQL · `Campanha` · `Conjunto` · `Anúncio` · `Especialidades` |
-| **Leads** (legado — popup/form antigo, só contada) | `<<PREENCHER: GID_LEADS>>` | `Data` · `Nome` · `Email` · `Telefone` · coluna de MQL · `Especialidade` · `utm_*` · `MQL` · `Compra Detectada`/`Faturamento Detectado`/`Data Compra` |
-| **Meta Ads** | `<<PREENCHER: GID_META>>` | `Day` · `Ad ID` · `Campaign Name` · `Ad Set Name` · `Ad Name` · `Amount Spent` · `Impressions` · `Link Clicks` · `Landing Page Views` · `Content Views` · `Adds to Cart` · `Subscriptions` · `Subscribe Conversion Value` |
-| **New Subscriptions** (Compradores) | `<<PREENCHER: GID_SALES>>` | `Data` · `Nome` · `Email` · `Telefone` · `Produto` · `Oferta` · `Faturamento` · `Receita` · `Método de Pagamento` · `Campanha` · `Conjunto` · `Anúncio` · `UF` · `Cidade` · `Zip Code` · `Endereço` |
+com CPM, CTR, CPC, ConvLP, CPV, Tx‑CHK, CPCHK, Tx‑Venda, **CAC**, Ticket médio e
+**ROAS**. Qualquer menção a MQL/lead/especialidade/telefone neste repositório é
+resquício do template e está errada — corrija ao encontrar.
 
-URL de export CSV: `https://docs.google.com/spreadsheets/d/<ID>/export?format=csv&gid=<GID>`
+## Fontes de dados (Google Sheets, somente leitura)
 
-### Regra de Lead Qualificado (MQL)
-Coluna de qualificação (<<PREENCHER: nome da coluna de MQL, ex. "É médico?">>) == "Sim".
-Lógica em `build.py` → `is_medico`. O gráfico "Leads por especialidade" (`app.js`,
-`renderGeralCore`) colore verde/cinza pelo mesmo critério, usando a coluna
-`Especialidades`/`Especialidade` como dimensão.
+São **duas planilhas diferentes** (o template pressupunha uma só). As abas são
+lidas **por NOME** via endpoint `gviz`, não por `gid`: o Sheets não expõe os gids
+publicamente e o nome da aba é estável e imune a reordenação.
 
-### Vendas & Faturamento (cruzamento com Compradores)
-`build.py` → `build_sales_index()` lê a aba **New Subscriptions** e indexa por
-**telefone** (normalizado, só dígitos) → lista de compras **não agregada**,
-uma entrada por linha: `[{d, fat, receita}, ...]` (`d` = data real daquela
-compra). Em `process()`, as linhas da **Conversas** são ordenadas pela **data
-já parseada** (`parse_date`, não a string bruta) para achar a **1ª conversa**
-(mais antiga de fato) de cada telefone; essa conversa define **apenas**
-camp/adset/ad da venda (o anúncio que trouxe aquele contato) — nunca a data.
-Cada compra vira um registro próprio em `DATA.sales[]`
-(`{d, camp, adset, ad, vendas:1, fat, receita}`) com a **data real da compra**.
-No navegador, `salesActive()` (`app.js`) filtra `sales[]` pela mesma data ativa
-que `leadsActive()`/`metaActive()`, e os três arrays (`fL`/`fM`/`fS`) se
-propagam juntos em `buildAgg`/`daily`/`totals`.
+| Fonte | Spreadsheet ID | Aba | Colunas usadas |
+|---|---|---|---|
+| **Meta Ads** (`Extração Dashboard - Cafe da Manha`) | `1KEmIpxN6fS-ovuLipmQTzGldKAIYAUznJStGeSSV7rM` | `Página 1` | `Day` · `Campaign Name` · `Ad Set Name` · `Ad Name` · `Impressions` · `Link Clicks` · `Landing Page Views` · `Amount Spent` · *(opcional)* `Initiate Checkout` · *(opcional)* permalink do criativo |
+| **Compradores** (`Partiu Empreender \| 2026`) | `1Qe1_LFcrd98hhOTa5rJAL78ZRUoHCZ-Pj4kIRgdiljI` | `Cafe da Manha Lucrativo` | `Data` · `Nome` · `Email` · `Valor da Compra` · `Forma de Pagto` · `Utm_source` · `utm_campaign` · `utm_medium` · `utm_content` · `Utm_term` · `Origem de Checkout` |
 
-**TODA venda entra na dash** (regra geral: "todas as vendas entram na Visão
-Geral; só as atribuídas ao Meta entram na aba de mídia paga"). O cruzamento
-Compradores × Conversas usa `canon_phone()` — **chave canônica** = DDD +
-últimos 8 dígitos, robusta a **DDI "55"** presente/ausente e ao **9º dígito**
-do celular. Quando o telefone bate com uma conversa, a venda recebe
-camp/adset/ad daquela conversa. Quando **não** bate, a venda **ainda conta nos
-totais/Visão Geral**, porém como `(sem campanha)` / `src="org"` — some apenas da
-quebra por campanha do Meta. `log_unmatched_sales()` loga no build quantas
-vendas ficaram sem anúncio de origem. **Não** usa as colunas `Compra Detectada`
-/ `Faturamento Detectado` já calculadas na planilha (decisão de projeto: cruzar
-do zero, mais robusto a erro de fórmula).
+URL de export CSV usada pelo build:
+`https://docs.google.com/spreadsheets/d/<ID>/gviz/tq?tqx=out:csv&headers=1&sheet=<NOME DA ABA>`
+
+Particularidades reais dessas planilhas:
+- `Amount Spent` vem com **vírgula decimal** (`26,64`) — `to_float()` trata.
+- `Data` dos Compradores vem **com hora** (`03/09/2026 01:22`) — `parse_date()`
+  corta a hora antes do `strptime` (sem isso, a venda perdia a data).
+- `utm_content` às vezes vem **URL-encoded** (`Capta%C3%A7%C3%A3o_CML`) —
+  `urldec()` decodifica e `squash()` casa com o nome canônico do Meta, senão o
+  mesmo anúncio viraria duas linhas.
+- A aba de Compradores tem 16 colunas vazias à direita — inofensivas.
+
+### Regra de VENDA (decisão do cliente)
+Só conta como venda a linha com **UTM completa** (`utm_campaign` + `utm_medium` +
+`utm_content`). Linha sem UTM é normalmente **Pix gerado e não pago** — é
+descartada de TODOS os números, e o build loga quantas e de que valor caíram
+fora (`process_sales`). Não existe bucket "(sem campanha)" nesta dash.
+
+### Atribuição
+**Por UTM, não por telefone** (a aba de Compradores não tem telefone).
+`utm_campaign`/`utm_medium`/`utm_content` são exatamente o
+`Campaign Name`/`Ad Set Name`/`Ad Name` do Meta Ads. O build indexa os nomes
+canônicos do Meta e casa por chave normalizada (sem acento, minúsculo, espaços
+colapsados). Venda cuja campanha não existe na aba de mídia entra nos totais e é
+logada como ATENÇÃO no build.
+
+### Checkouts iniciados
+A quantidade vem da coluna **Initiate Checkout** (Adveronix) na aba de mídia.
+O **custo por checkout é calculado na dash** (gasto ÷ checkouts) — não precisa
+exportar coluna de custo. O build detecta a coluna sozinho (`B.has_checkout`):
+existindo, a etapa e as colunas Tx‑CHK/CPCHK entram no funil, nas tabelas diárias,
+nas hierárquicas e no ranking de anúncios; faltando, aparecem como "-" e o funil
+marca a etapa como "sem dado". Aliases aceitos em `build.py` cobrem variações do
+cabeçalho (`Initiate Checkout`, `Checkouts iniciados`, `Adds to Cart`…).
 
 ### Imposto da mídia paga
-`TAX_FACTOR` em `build.py`, com **default `1.13806`** (13,806%) já configurado no
-template — aplica-se somente ao gasto de **Meta Ads**. O toggle "Imposto Meta"
-fica **ativo por padrão** (`STATE.tax=true` em `app.js`) e aplica o fator em
-todo o gasto de mídia paga/derivados (CPL, CPMQL, CAC etc.) via `taxf()`, que só
-multiplica `a.sp` (gasto do Meta Ads) — nunca outras fontes; desativar o toggle
-volta ao gasto sem imposto. Se o cliente tiver um fator diferente, ajuste
-`TAX_FACTOR`; se não houver imposto, use `TAX_FACTOR = 1.0`.
+`TAX_FACTOR = 1.13806` (13,806%) em `build.py`, aplicado **somente** ao gasto de
+Meta Ads. O toggle "Imposto Meta" fica **ativo por padrão** (`STATE.tax=true`) e
+aplica o fator em todo o gasto e derivados (CPM, CPC, CPV, CPCHK, CAC, ROAS) via
+`taxf()`, que só multiplica `a.sp`.
 
-### Convenções de campanha (do cliente)
-Todas as campanhas usam o prefixo `<<PREENCHER: MAIN_PRODUCT_PREFIX>>`
-(`MAIN_PRODUCT_PREFIX`), sem filtrar por sub-funil — mantém TODAS as campanhas
-no dashboard. Ajuste o prefixo e, se o cliente usar siglas de etapa
-(ex. `<<PREENCHER: siglas de etapa, se houver>>`), documente-as aqui. A Conversas
-já traz `Campanha`/`Conjunto`/`Anúncio` prontos (nomes idênticos ao
-`Campaign Name`/`Ad Set Name`/`Ad Name` do Meta Ads) — `build.py` só copia esses
-valores, sem precisar de UTM nessa aba.
+### Convenções de campanha (Sigla do Funil)
+Padrão: `CML | E6-VEN | P3-FRIO | CONV | CBO | VA | 2026-09-02 | Teste de Criativos 1`
+
+- **`CML` = sigla do funil** (Café da Manhã Lucrativo) — `MAIN_PRODUCT_PREFIX`.
+  Aparece nas 6 campanhas e no sufixo de todos os anúncios (`_CML`). É a única.
+- `E6-VEN` etapa de venda · `P3-FRIO` público frio · `CONV` objetivo conversão ·
+  `CBO`/`ABO` estrutura de verba · `VA` variação · depois data e nome do teste.
+
+### Privacidade
+A página é **pública** (repo público + GitHub Pages). Nome vira `Fulano S.`
+(`first_last_initial`) e e‑mail vira `fu****@dominio.com` (`mask_email`) antes de
+entrar no HTML. Nunca publicar PII crua.
 
 ## Arquitetura / arquivos
 
 ```
-build/build.py            # lê os CSVs (read-only), emite REGISTROS BRUTOS (leads[]/meta[]/sales[]/ad_links); render() COSTURA os 4 arquivos abaixo
+build/build.py            # lê os 2 CSVs (read-only), emite REGISTROS BRUTOS (meta[]/sales[]/ad_links); render() costura os 4 arquivos abaixo
 build/template.html       # esqueleto HTML. Placeholders __STYLES__, __APP_JS__, __DATA_JSON__, __BUILD_ID__, __GENERATED_BRT__
 build/identidade-visual.css  # TODAS as cores (tema claro=padrão / escuro). Mexa AQUI p/ trocar só cor
 build/estilos.css         # layout/componentes (sidebar, topbar, period-picker, funil, tabelas, gráficos, aba Relatório)
 build/app.js              # lógica + renderização (KPIs, funil, tabelas, filtro cruzado, period-picker, heatmap, Relatório)
-build/relatorios.json     # Insights de Tráfego por período (aba Relatório) — VERSIONADO; lido no build, sem API. Vazio no template ({}).
-build/relatorios_dados.json      # números brutos por período (insumo p/ a Routine escrever relatorios.json) — não lido pelo site. Vazio no template ({}).
-build/relatorio_lib.py           # datas/agregação compartilhadas (gerar_relatorios.py + coletar_dados_relatorio.py)
+build/relatorios.json     # Insights de Tráfego por período (aba Relatório) — VERSIONADO; lido no build, sem API. Vazio ({}) até existir Routine.
+build/relatorios_dados.json      # números brutos por período (insumo p/ a Routine escrever relatorios.json) — não lido pelo site
+build/relatorio_lib.py           # datas/agregação compartilhadas (mesmo funil de venda direta)
 build/coletar_dados_relatorio.py # gera relatorios_dados.json (só números, sem texto) — roda no briefing.yml, 1x/dia
-build/gerar_relatorios.py        # gera relatorios.json determinístico (sem IA) — fallback MANUAL, não roda mais sozinho
-build/GUIA-RELATORIOS.md            # formato/estrutura dos Insights da aba Relatório (os 7 blocos) — preencher o contexto do funil
-build/GUIA-INTERPRETACAO-METRICAS.md # regras de diagnóstico por métrica (High Ticket) — leitura obrigatória p/ redigir
+build/GUIA-RELATORIOS.md            # formato/estrutura dos Insights da aba Relatório (os 7 blocos)
+build/GUIA-INTERPRETACAO-METRICAS.md # regras de diagnóstico por métrica — leitura obrigatória p/ redigir
 .github/workflows/deploy.yml    # roda build.py e publica no Pages (workflow_dispatch + schedule + push)
 .github/workflows/briefing.yml  # roda coletar_dados_relatorio.py e commita relatorios_dados.json na main (cron 1x/dia)
 dist/index.html           # saída gerada (gitignored; o Actions reconstrói)
 GUIA-REPLICACAO.md        # como replicar este modelo para outros relatórios/clientes
-SETUP-CRON.md             # valores exatos do cron-job.org (com marcadores a preencher)
+SETUP-CRON.md             # valores exatos do cron-job.org
 ```
 
-### Aba Relatório
-Terceira página (sidebar, entre a de mídia paga e o rodapé). **Espelha a Visão
-Geral** (mesmo funil/KPIs/gráficos/tabela diária, via `renderGeralCore(REL_IDS)`)
-e, abaixo, acrescenta 3 blocos novos + um painel de metas editável:
-- **Metas & parâmetros (painel editável)** — no topo da aba: Meta CPMQL, Meta CAC, Volume
-  mínimo amostral (MQLs), N dias p/ corte. Persiste em `localStorage['dm_metas']`, default de
-  `build.py` (`META_CPMQL`/`META_CAC`=None → "não definida"; `VOLUME_MIN_AMOSTRAL`/`N_DIAS_CORTE`).
-  Editar recolore **CPMQL/CAC** nas tabelas de anúncio (verde ≤ meta · amarelo até +30% ·
-  vermelho acima) e ajusta o badge Em observação/Avaliável, **tudo ao vivo**
-  (`METAS` + `renderRelAds()` em `app.js`).
-- **Top Anúncios** e **Piores Anúncios** — 17 colunas + coluna **Status** (Anúncio · Status ·
-  Campanha · Conjunto · Gasto · Impr · CPM · CTR · Leads · CPL · MQLs · Tx‑MQL · CPMQL · ConvMQL ·
-  Vendas · CAC · Faturamento · ROAS · **Link**). Anúncio, Status e Link ficam **sticky**.
-  Ranking pelo **resultado mais profundo disponível** (Venda→MQL), amostra relevante primeiro;
-  sem amostra → badge **"Em observação"**. Limiares em `build.py`: `SAMPLE_MIN_SPEND`,
-  `SAMPLE_MIN_MQLS`, `TOP_ADS_N`.
-- **Insights de Tráfego** — texto por período redigido pelo **Claude** (linguagem de
-  gestor de tráfego), lido de `build/relatorios.json` (sem API no build/navegador —
-  o site só exibe o texto já pronto). Formato em **4 quadrantes** por período. Cada
-  período compara com o período anterior **correto para aquela janela** (regra em
-  `relatorio_lib.previous_period`). Chaves de período fixas
-  (`hoje/ontem/3d/7d/14d/30d/mes/mespass/todo`), tags `Escalar/Otimizar/Cortar/Observar`.
-  Toda a aritmética é pré-calculada em `build/relatorios_dados.json` — a Routine só
-  interpreta, nunca recalcula. Regras completas em `build/GUIA-RELATORIOS.md` +
-  `build/GUIA-INTERPRETACAO-METRICAS.md`. `app.js` ainda reconhece o formato antigo
-  (`{"html": "…"}`) como fallback.
+> **Nota:** `build/gerar_relatorios.py` (gerador determinístico de texto, fallback
+> manual) foi **removido** na conversão para venda direta — ele era todo escrito
+> no vocabulário de MQL do template e quebraria no schema novo. O pipeline diário
+> de números (`coletar_dados_relatorio.py`) continua funcionando.
 
-### Briefing automático do gestor (Routine do Claude, sem chamada à API Anthropic)
-`build/relatorios.json` pode ser escrito 1×/dia por uma **Routine do Claude**
-(Claude Code Remote — mesma infraestrutura de sessão/agente deste repo, agendada;
-não é chamada paga à API). Fluxo em 2 etapas, porque o ambiente da Routine não
-alcança `docs.google.com` (só o runner do GitHub Actions alcança):
-1. `build/coletar_dados_relatorio.py` (GitHub Actions, `.github/workflows/briefing.yml`,
-   1×/dia) agrega **só números** em `build/relatorios_dados.json` e commita na `main`.
-2. A Routine do Claude lê esse JSON + `build/GUIA-RELATORIOS.md` +
-   `build/GUIA-INTERPRETACAO-METRICAS.md`, redige `build/relatorios.json` e faz
-   commit/push direto na `main`, disparando o `deploy.yml`. **Precisa ser criada
-   por cliente** (`create_trigger` apontando para o repo novo) — não vem pronta.
+### Modelo de dados no navegador
+`DATA.meta[]` = 1 linha por dia × campanha × conjunto × anúncio
+(`{d, camp, adset, ad, sp, im, cl, pv, ck}`).
+`DATA.sales[]` = 1 linha por COMPRA
+(`{d, src, camp, adset, ad, plat, pay, vendas, fat, nm, em}`), na **data real da
+compra**. Um "agregado" em `app.js` é sempre `{sp,im,cl,pv,chk,vendas,fat}`, venha
+de campanha, anúncio, dia ou total — `derive()` calcula as métricas de mídia e
+`salesOf()` as de venda (CAC, ROAS, ticket, taxas).
 
-`build/gerar_relatorios.py` (gerador determinístico, sem IA) continua no repo só
-como **fallback manual**. Limitação conhecida: usa os defaults de `build.py`
-(`META_CPMQL`/`META_CAC`/`VOLUME_MIN_AMOSTRAL`/`N_DIAS_CORTE`), não o que o gestor
-editou no painel (fica em `localStorage`).
+### Páginas
+1. **Visão Geral de Vendas** — funil vertical + KPIs secundários; gráfico combinado
+   diário (barras Visitas/Checkouts, linha verde de Vendas em eixo próprio, linhas
+   de Gasto e CAC em R$) + tabela diária com heatmap; distribuição das vendas por
+   campanha / posicionamento (`Utm_term`) / forma de pagamento / anúncio.
+2. **Mídia Paga (Meta Ads)** — mesmo funil respeitando o filtro cruzado; vendas por
+   anúncio; donut de conversão da LP; compilado de anúncios; 3 tabelas hierárquicas
+   Campanha → Conjunto → Anúncio, cada uma com gráfico de **custo por visita por
+   dia** (métrica densa; o CAC do período aparece na legenda) ; lista de Compradores.
+3. **Relatório** — espelha a Visão Geral + painel de Metas editável + ranking de
+   anúncios + Insights de Tráfego. Ver `build/GUIA-RELATORIOS.md`.
 
-Funil completo: `Impressões → Cliques → Leads → MQLs → Agendamentos → Reuniões
-Realizadas → Vendas → Faturamento`. Enquanto só houver mídia paga × Leads, o funil
-vai até MQL; Agendamentos/Reuniões/Vendas/Fat aparecem "-" até chegar a lista do
-comercial.
-
-### Link do criativo (aba de mídia paga)
-`build.py` lê uma coluna opcional de permalink do criativo na aba de mídia →
-mapa `ad_links` (anúncio → 1 permalink). Usado no "Link" das tabelas Top/Piores.
-Sem a coluna, o link vira "—".
-
-> **Layout modular:** o front-end é separado em `identidade-visual.css` + `estilos.css`
-> + `app.js`, costurados por `render()` nos placeholders `__STYLES__`/`__APP_JS__`.
-> Página 1 usa **funil vertical de leads** + KPIs secundários. Topbar tem
-> **seletor de período em calendário** (default "Este mês"). **Heatmap** = cor FIXA
-> por métrica (só opacidade varia): **Gasto=vermelho · Leads=azul · MQLs=ciano ·
-> Vendas=verde · ROAS=amarelo** (`--heat-gasto/leads/mqls/vendas/roas`).
-
-O `build.py` **não agrega**: exporta as linhas cruas e TODA a lógica (filtros de
-data, filtro cruzado, KPIs, tabelas, gráficos, heatmap, imposto) roda no navegador.
-
-## Rodar/testar local
-
-```bash
-python build/build.py --leads-file leads.csv --meta-file meta.csv --out dist/index.html
-# (o sandbox do agente NÃO alcança docs.google.com; use CSVs locais para testar.
-#  O runner do GitHub Actions tem internet e busca os CSVs ao vivo.)
-```
-
-## Especificação funcional (resumo)
-
-Três **páginas separadas** (sidebar):
-1. **Visão Geral de Leads** — funil vertical (Gasto → Impressões → Cliques → Leads →
-   MQLs → Vendas/Faturamento) + KPIs secundários; gráfico combinado diário +
-   tabela diária com heatmap (todos os leads); barras por origem/faixa/plataforma/profissão.
-2. **Captura mídia paga** — funil em etapas; combinado diário; barras por utm_content;
-   tabela diária com heatmap (só mídia paga); 3 tabelas hierárquicas Campanha →
-   Conjunto → Anúncio, cada uma com gráfico de linha embaixo.
-3. **Relatório** — espelha a Visão Geral + painel de Metas editável + Top/Piores
-   Anúncios (17 colunas + Status) + Insights de Tráfego. Ver `build/GUIA-RELATORIOS.md`.
-
-**Ordem das colunas nas tabelas:** `Data · Dia · Gasto · CPM · CTR · ConvForm · Leads ·
-CPL · Tx‑MQL · MQLs · CPMQL · ConvMQL · Vendas · CAC · Fat. · Receita · ROAS`. Nas
-tabelas diárias entram também **Checkouts** e **VisCHK** (da coluna "Adds to Cart"
-do Meta Ads, proxy de Checkout). Sem essas colunas, ficam "-".
+**Ordem das colunas nas tabelas diárias:** `Data · Dia · Gasto · CPM · CTR ·
+Cliques · CPC · Visitas · ConvLP · CPV · [Checkouts · Tx‑CHK · CPCHK] · Vendas ·
+Tx‑Venda · CAC · Ticket · Fat. · ROAS`.
 
 **Regras obrigatórias das tabelas** (ver `GUIA-REPLICACAO.md`): cabeçalho sticky;
 ordenação tri‑state; colunas redimensionáveis (persist localStorage); linha
 "Total Geral" fixa; dimensão nunca truncada; seleção com toggle + Ctrl multi;
 filtro cruzado bidirecional; tabela diária com último dia no topo; heatmap de cor
-fixa por métrica.
+fixa por métrica: **Gasto=vermelho · Visitas=azul · Checkouts=ciano ·
+Vendas=verde · ROAS=amarelo** (`--heat-gasto/vis/chk/vendas/roas`).
 
-## Lacunas de dados (comuns até o cliente enviar mais fontes)
-- **Agendamentos / Reuniões Realizadas** → precisam da lista do comercial; aparecem "-".
-- **Page Views, CR, CPV, ConvLP** → precisam de uma fonte de page views.
-- Enquanto não vierem, essas métricas aparecem como "-".
+### Painel de Metas (aba Relatório)
+Meta CAC · Meta ROAS · Volume mín. amostral (vendas) · Gasto mín. amostral (R$) ·
+N dias p/ corte. Persiste em `localStorage['dm_metas']`, default de `build.py`
+(`META_CAC`/`META_ROAS` = None → "não definida"; `SAMPLE_MIN_SPEND=347` ≈ 1 ticket;
+`SAMPLE_MIN_SALES=1`). Editar recolore **CAC** (menor é melhor) e **ROAS** (maior é
+melhor) nas tabelas de anúncio e reavalia o badge Em observação/Avaliável ao vivo.
+
+### Briefing automático (Routine do Claude) — opcional, não configurado
+`build/relatorios.json` pode ser escrito 1×/dia por uma **Routine do Claude**, em
+2 etapas (o ambiente da Routine não alcança `docs.google.com`):
+1. `coletar_dados_relatorio.py` (Actions, `briefing.yml`, 1×/dia) agrega **só
+   números** em `relatorios_dados.json` e commita na `main`.
+2. A Routine lê esse JSON + os 2 guias, redige `relatorios.json` e commita na
+   `main`, disparando o `deploy.yml`. **Precisa ser criada por cliente**
+   (`create_trigger`) — ainda **não existe** para este repo, então a aba mostra o
+   estado vazio ("Insights ainda não gerados").
+
+## Rodar/testar local
+
+```bash
+python build/build.py --meta-file meta.csv --sales-file sales.csv --out dist/index.html
+# (o sandbox do agente NÃO alcança docs.google.com; use CSVs locais para testar.
+#  O runner do GitHub Actions tem internet e busca os CSVs ao vivo.)
+```
+
+Para conferir o front sem internet: o `index.html` gerado carrega o Chart.js da
+CDN; num sandbox sem rede, substitua a tag por um stub de `Chart` e renderize com
+o Chromium headless (`--dump-dom`) para caçar erro de JS.
+
+## Lacunas de dados conhecidas
+- **Checkouts iniciados** dependem da coluna do Adveronix; sem ela, a etapa e as
+  colunas Tx‑CHK/CPCHK aparecem "-".
+- **Link do criativo**: a aba de mídia não tem permalink hoje, então a coluna
+  "Link" do ranking de anúncios fica oculta (`HAS_LINKS`). Adicionando a coluna na
+  planilha, ela volta sozinha.
+- **Frequência / alcance** não são exportados pelo Adveronix hoje.
 
 ## Publicação — problemas conhecidos
 1. **Push:** se a integração GitHub da sessão for somente‑leitura (403), o caminho
    é `git push` direto para `github.com` com o **PAT do usuário**. Nunca gravar o
    token no `.git/config` (usar URL efêmera `https://x-access-token:<TOKEN>@github.com/...`).
 2. **cron-job.org só funciona na `main`:** `workflow_dispatch` só existe na branch
-   padrão. Levar `build/` + `.github/workflows/deploy.yml` para a `main`.
-3. **Pages liga sozinho:** `actions/configure-pages@v5` com `enablement: true`
+   padrão.
+3. **Pages liga sozinho:** `actions/configure-pages@v6` com `enablement: true`
    (precisa `permissions: pages: write, id-token: write`).
-4. **Proxy do sandbox:** o ambiente do agente costuma NÃO alcançar `docs.google.com`,
-   `*.github.io` nem a API REST de Actions/Pages — mas o runner do Actions alcança tudo.
+4. **Proxy do sandbox:** o ambiente do agente NÃO alcança `docs.google.com`,
+   `cdn.jsdelivr.net`, `*.github.io` nem parte da API REST de Actions/Pages (o
+   proxy devolve 403 em `PUT /actions/permissions/*` e em `/pages`) — mas o runner
+   do Actions alcança tudo. Para ler dados das planilhas de dentro do sandbox, rode
+   um workflow descartável no Actions e leia o log.
 5. **Token exposto:** se um token foi colado no chat, **revogar e gerar um novo**.
 
 ## Branch / git
