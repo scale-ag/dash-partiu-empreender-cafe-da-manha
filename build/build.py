@@ -302,8 +302,9 @@ def process_meta(meta_rows):
         # Initiate Checkout (o cliente ligou no Adveronix). A QUANTIDADE vem da
         # planilha; o CUSTO por checkout e' calculado na dash (gasto / checkouts),
         # entao nao precisa de coluna de custo aqui.
-        "chk": ["initiate checkout", "initiates checkout", "initiated checkout",
-                "website initiate checkout", "checkouts iniciados", "checkout iniciado",
+        "chk": ["checkouts initiated", "checkout initiated", "initiate checkout",
+                "initiates checkout", "initiated checkout", "website initiate checkout",
+                "checkouts iniciados", "checkout iniciado",
                 "inicios de finalizacao de compra", "inicio de finalizacao de compra",
                 "adds to cart", "add to cart"],
         # Link do criativo — coluna opcional; sem ela a coluna "Link" some da UI.
@@ -311,6 +312,17 @@ def process_meta(meta_rows):
                  "creative link", "link do anuncio", "link do criativo"],
     })
     require(idx, ["day", "campaign", "adset", "ad", "spent", "impr", "clicks"], header, f"Meta Ads ({META_SHEET})")
+    # Rede de seguranca p/ a coluna de checkout: o Adveronix exporta o nome com
+    # ordem de palavras variavel ("Checkouts Initiated", "Initiate Checkout",
+    # "Checkouts iniciados"...). Se nenhum alias casou, aceita QUALQUER coluna que
+    # fale de checkout e nao seja de custo/valor (o custo a dash calcula sozinha).
+    if idx["chk"] is None:
+        for i, h in enumerate(header):
+            hn = norm(h)
+            if "checkout" in hn and not any(w in hn for w in ("cost", "custo", "value", "valor", "cpa", "per ")):
+                idx["chk"] = i
+                print(f"  [chk] coluna de checkout reconhecida por heuristica: {h!r}", file=sys.stderr)
+                break
 
     meta, ad_links = [], {}
     for row in meta_rows[1:]:
