@@ -20,76 +20,112 @@ jobs:
       - name: Probe (somente leitura; imprime cabecalhos, sem PII)
         run: |
           python3 - <<'PY'
-          import csv, io, json, re, urllib.request
+          import csv, io, re, urllib.parse, urllib.request
 
           SHEETS = {
             "META":   ("1KEmIpxN6fS-ovuLipmQTzGldKAIYAUznJStGeSSV7rM", "Página 1"),
             "VENDAS": ("1Qe1_LFcrd98hhOTa5rJAL78ZRUoHCZ-Pj4kIRgdiljI", "Cafe da Manha Lucrativo"),
           }
-          PII = ("nome","name","email","e-mail","telefone","phone","cpf","endereco","endereço","address","zip","cep","documento")
+          PII = ("nome","name","email","e-mail","telefone","phone","cpf","endereco","endereço","address","zip","cep","documento","whats")
+          UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/128.0.0.0 Safari/537.36")
 
           def get(url):
-              req = urllib.request.Request(url, headers={"User-Agent":"probe/1.0"})
+              req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
               with urllib.request.urlopen(req, timeout=120) as r:
-                  return r.read().decode("utf-8", errors="replace")
+                  return r.geturl(), r.status, r.read().decode("utf-8", errors="replace")
 
           def tabs(sid):
-              html = get(f"https://docs.google.com/spreadsheets/d/{sid}/htmlview")
-              out = []
-              for m in re.finditer(r'\{"[^{}]*?"name":"(.*?)"[^{}]*?\}', html):
-                  pass
-              # mapeamento robusto: procura pares nome/gid no bootstrap
-              for m in re.finditer(r'"name":"((?:[^"\\]|\\.)*)"[^{}]{0,400}?"gid":"?(\d+)"?', html):
-                  name = m.group(1).encode().decode("unicode_escape")
-                  out.append((name, m.group(2)))
-              # fallback: links de menu
-              for m in re.finditer(r'id="sheet-button-(\d+)"[^>]*>([^<]+)<', html):
-                  out.append((m.group(2), m.group(1)))
+              cands = []
+              for path in ("/edit", "/htmlview", "/pubhtml"):
+                  try:
+                      final, st, html = get(f"https://docs.google.com/spreadsheets/d/{sid}{path}")
+                  except Exception as e:
+                      print(f"   [{path}] ERRO {e!r}"); continue
+                  print(f"   [{path}] status={st} len={len(html)} final={final[:120]}")
+                  for m in re.finditer(r'\{"([^"]{1,80})":(\d+)\}', ""):
+                      pass
+                  pats = [
+                    r'"name":"((?:[^"\\]|\\.)*)"[^{}]{0,600}?"(?:gid|sheetId)":"?(\d+)"?',
+                    r'"(?:gid|sheetId)":"?(\d+)"?[^{}]{0,600}?"name":"((?:[^"\\]|\\.)*)"',
+                    r'id="sheet-button-(\d+)"[^>]*>([^<]+)<',
+                    r'\[null,"((?:[^"\\]|\\.)*)",(\d{1,12}),',
+                  ]
+                  for pi, p in enumerate(pats):
+                      for m in re.finditer(p, html):
+                          a, b = m.group(1), m.group(2)
+                          name, gid = (a, b) if not a.isdigit() else (b, a)
+                          try: name = name.encode().decode("unicode_escape")
+                          except Exception: pass
+                          cands.append((name.strip(), gid))
+                  if cands:
+                      break
               seen, uniq = set(), []
-              for n,g in out:
-                  if (n,g) in seen: continue
-                  seen.add((n,g)); uniq.append((n,g))
+              for n, g in cands:
+                  if (n, g) in seen or not n: continue
+                  seen.add((n, g)); uniq.append((n, g))
               return uniq
 
-          def rows(sid, gid):
-              raw = get(f"https://docs.google.com/spreadsheets/d/{sid}/export?format=csv&gid={gid}")
-              return list(csv.reader(io.StringIO(raw)))
-
-          for label,(sid,want) in SHEETS.items():
-              print("="*78); print(f"### {label}  spreadsheet={sid}  aba alvo={want!r}")
-              t = tabs(sid)
-              print(f"-- abas encontradas ({len(t)}):")
-              for n,g in t: print(f"   name={n!r}  gid={g}")
-              gid = None
-              for n,g in t:
-                  if n.strip().lower() == want.strip().lower(): gid = g; break
-              if gid is None:
-                  for n,g in t:
-                      if want.strip().lower()[:10] in n.strip().lower(): gid = g; break
-              print(f"-- gid escolhido: {gid}")
-              if gid is None: continue
-              rs = rows(sid, gid)
+          def dump(label, rs):
               print(f"-- linhas totais (inclui cabecalho): {len(rs)}")
               hdr = rs[0] if rs else []
-              print(f"-- COLUNAS ({len(hdr)}):")
               body = [r for r in rs[1:] if any((c or '').strip() for c in r)]
               print(f"-- linhas de dados nao-vazias: {len(body)}")
-              for i,h in enumerate(hdr):
+              print(f"-- COLUNAS ({len(hdr)}):")
+              for i, h in enumerate(hdr):
                   low = (h or "").lower()
                   masked = any(p in low for p in PII)
                   samples = []
-                  for r in body[:400]:
+                  for r in body[:800]:
                       v = (r[i] if i < len(r) else "").strip()
                       if v:
                           samples.append("<REDACTED len=%d>" % len(v) if masked else v)
                       if len(samples) >= 3: break
                   print(f"   [{i:>2}] {h!r}  ex: {samples}")
-              # distintos uteis (nao-PII)
-              for target in ("campaign name","ad set name","ad name","produto","oferta","metodo de pagamento","método de pagamento","status"):
-                  for i,h in enumerate(hdr):
-                      if (h or "").strip().lower() == target:
-                          vals = sorted({(r[i] if i < len(r) else "").strip() for r in body if (r[i] if i < len(r) else "").strip()})
-                          print(f"-- distintos de {h!r}: {len(vals)}")
-                          for v in vals[:80]: print(f"     * {v}")
-                          if len(vals) > 80: print(f"     ... (+{len(vals)-80})")
+              for i, h in enumerate(hdr):
+                  t = (h or "").strip().lower()
+                  if t in ("campaign name","ad set name","ad name","nome da campanha","produto","oferta",
+                           "método de pagamento","metodo de pagamento","status","plataforma","utm_campaign",
+                           "utm_source","utm_medium","utm_content","utm_term","campanha","conjunto","anuncio","anúncio"):
+                      vals = sorted({(r[i] if i < len(r) else "").strip() for r in body if (r[i] if i < len(r) else "").strip()})
+                      print(f"-- distintos de {h!r}: {len(vals)}")
+                      for v in vals[:120]: print(f"     * {v}")
+                      if len(vals) > 120: print(f"     ... (+{len(vals)-120})")
+
+          for label, (sid, want) in SHEETS.items():
+              print("="*78); print(f"### {label}  spreadsheet={sid}  aba alvo={want!r}")
+              t = tabs(sid)
+              print(f"-- abas encontradas ({len(t)}):")
+              for n, g in t: print(f"   name={n!r}  gid={g}")
+              gid = None
+              for n, g in t:
+                  if n.strip().lower() == want.strip().lower(): gid = g; break
+              if gid is None:
+                  for n, g in t:
+                      if want.strip().lower()[:10] in n.strip().lower(): gid = g; break
+              print(f"-- gid escolhido: {gid}")
+              rs = None
+              if gid is not None:
+                  try:
+                      _, _, raw = get(f"https://docs.google.com/spreadsheets/d/{sid}/export?format=csv&gid={gid}")
+                      rs = list(csv.reader(io.StringIO(raw)))
+                      print("-- via export?gid OK")
+                  except Exception as e:
+                      print(f"-- export?gid falhou: {e!r}")
+              if rs is None:
+                  q = urllib.parse.quote(want)
+                  try:
+                      _, _, raw = get(f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq?tqx=out:csv&sheet={q}")
+                      rs = list(csv.reader(io.StringIO(raw)))
+                      print("-- via gviz(sheet=nome) OK")
+                  except Exception as e:
+                      print(f"-- gviz falhou: {e!r}")
+              if rs is None:
+                  try:
+                      _, _, raw = get(f"https://docs.google.com/spreadsheets/d/{sid}/export?format=csv")
+                      rs = list(csv.reader(io.StringIO(raw)))
+                      print("-- via export (1a aba) OK")
+                  except Exception as e:
+                      print(f"-- export 1a aba falhou: {e!r}"); continue
+              dump(label, rs)
           PY
